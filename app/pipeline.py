@@ -10,6 +10,7 @@ from app.preprocessing.deskew import DeskewCorrector
 from app.preprocessing.denoise import Denoiser
 from app.preprocessing.contrast import ContrastEnhancer
 from app.preprocessing.resize import ImageResizer
+from app.ocr.paddle_ocr import PaddleOCRProcessor
 
 
 class DocumentPipeline:
@@ -74,6 +75,7 @@ class DocumentPipeline:
         self.denoiser = Denoiser(method="nlm")
         self.contrast = ContrastEnhancer()
         self.resizer = ImageResizer(target_longest_side=2500)
+        self.ocr = PaddleOCRProcessor()
 
     def run(self) -> list[np.ndarray]:
         """
@@ -120,6 +122,8 @@ class DocumentPipeline:
 
             resized_image = self.resizer.resize(contrast_image)
 
+            ocr_results = self.ocr.recognize(resized_image)
+
             # ------------------------------------------------------
             # Save intermediate images (development mode)
             # ------------------------------------------------------
@@ -148,7 +152,9 @@ class DocumentPipeline:
             # Store final processed page
             # ------------------------------------------------------
 
-            processed_pages.append(resized_image)
+            processed_pages.append({
+                "image": resized_image,
+                "ocr": ocr_results,})
 
         # ==========================================================
         # Pipeline completed
