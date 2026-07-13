@@ -1,4 +1,4 @@
-from paddleocr import PaddleOCR
+from paddleocr import PaddleOCR  # pyright: ignore[reportMissingImports]
 import numpy as np
 
 

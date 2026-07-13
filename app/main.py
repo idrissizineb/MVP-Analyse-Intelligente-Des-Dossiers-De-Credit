@@ -11,6 +11,11 @@ def main():
     processed_pages = pipeline.run()
 
     print(f"\nTotal processed pages: {len(processed_pages)}")
+    print("\n========== OCR RESULTS ==========\n")
+
+    for page in processed_pages:
+        for line in page["ocr"]:
+            print(line)
 
 
 if __name__ == "__main__":
