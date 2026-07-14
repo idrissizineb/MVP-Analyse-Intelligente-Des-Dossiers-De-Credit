@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import cv2
+import json
 import numpy as np
 
 from app.preprocessing.loader import DocumentLoader
@@ -11,6 +12,7 @@ from app.preprocessing.denoise import Denoiser
 from app.preprocessing.contrast import ContrastEnhancer
 from app.preprocessing.resize import ImageResizer
 from app.ocr.paddle_ocr import PaddleOCRProcessor
+from app.postprocessing.ocr_postprocessor import OCRPostProcessor
 
 
 class DocumentPipeline:
@@ -76,8 +78,9 @@ class DocumentPipeline:
         self.contrast = ContrastEnhancer()
         self.resizer = ImageResizer(target_longest_side=2500)
         self.ocr = PaddleOCRProcessor()
+        self.postprocessor = OCRPostProcessor(min_confidence=0.70)
 
-    def run(self) -> list[np.ndarray]:
+    def run(self) -> list[dict]:
         """
         Execute the preprocessing pipeline.
 
@@ -124,6 +127,8 @@ class DocumentPipeline:
 
             ocr_results = self.ocr.recognize(resized_image)
 
+            ocr_results = self.postprocessor.filter_confidence(ocr_results)
+
             # ------------------------------------------------------
             # Save intermediate images (development mode)
             # ------------------------------------------------------
@@ -135,12 +140,23 @@ class DocumentPipeline:
                 denoise_path = self.output_dir / f"page_{page_number}_denoised.png"
                 contrast_path = self.output_dir / f"page_{page_number}_contrast.png"
                 resize_path = self.output_dir / f"page_{page_number}_resized.png"
+                ocr_json_path = self.output_dir / f"page_{page_number}_ocr.json"
 
                 cv2.imwrite(str(gray_path), gray_image)
                 cv2.imwrite(str(deskew_path), deskewed_image)
                 cv2.imwrite(str(denoise_path), denoised_image)
                 cv2.imwrite(str(contrast_path), contrast_image)
                 cv2.imwrite(str(resize_path), resized_image)
+
+                with open(ocr_json_path, "w", encoding="utf-8") as file:
+                    json.dump(
+                        ocr_results,
+                        file,
+                        indent=4,
+                        ensure_ascii=False
+                    )
+
+                print(f"✓ Saved: {ocr_json_path.name}")
 
                 print(f"✓ Saved: {gray_path.name}")
                 print(f"✓ Saved: {deskew_path.name}")
