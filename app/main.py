@@ -4,7 +4,7 @@ from app.pipeline import DocumentPipeline
 def main():
 
     pipeline = DocumentPipeline(
-        pdf_path="data/input/attestation de scolarite.pdf",
+        pdf_path="data/input/FICHE DE DECISION TEST.pdf",
         save_intermediate=True
     )
 

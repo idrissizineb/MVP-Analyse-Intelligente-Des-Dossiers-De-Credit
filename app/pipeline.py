@@ -13,6 +13,10 @@ from app.preprocessing.contrast import ContrastEnhancer
 from app.preprocessing.resize import ImageResizer
 from app.ocr.paddle_ocr import PaddleOCRProcessor
 from app.postprocessing.ocr_postprocessor import OCRPostProcessor
+from app.postprocessing.text_reconstructor import TextReconstructor
+from app.llm.groq_client import GroqClient
+from app.llm.field_extractor import FieldExtractor
+
 
 
 class DocumentPipeline:
@@ -79,6 +83,13 @@ class DocumentPipeline:
         self.resizer = ImageResizer(target_longest_side=2500)
         self.ocr = PaddleOCRProcessor()
         self.postprocessor = OCRPostProcessor(min_confidence=0.70)
+        self.reconstructor = TextReconstructor()
+        # -------------------------------
+        # Initialize LLM modules
+        # -------------------------------
+
+        self.groq = GroqClient()
+        self.extractor = FieldExtractor(self.groq)
 
     def run(self) -> list[dict]:
         """
@@ -129,6 +140,30 @@ class DocumentPipeline:
 
             ocr_results = self.postprocessor.filter_confidence(ocr_results)
 
+            ocr_results = self.postprocessor.sort_reading_order(ocr_results)
+
+            reconstructed_lines = self.reconstructor.reconstruct(ocr_results)
+
+            # ------------------------------------------------------
+            # Convert reconstructed lines into one text block
+            # ------------------------------------------------------
+
+            ocr_text = "\n".join(reconstructed_lines)
+
+            # ------------------------------------------------------
+            # Correct OCR using Groq
+            # ------------------------------------------------------
+
+            corrected_text = self.groq.correct_ocr(ocr_text)
+
+            print("\n===== Corrected OCR =====\n")
+            print(corrected_text)
+
+            print("\n===== Reconstructed Document =====")
+
+            for line in reconstructed_lines:
+                print(line)
+
             # ------------------------------------------------------
             # Save intermediate images (development mode)
             # ------------------------------------------------------
@@ -170,12 +205,36 @@ class DocumentPipeline:
 
             processed_pages.append({
                 "image": resized_image,
-                "ocr": ocr_results,})
+                "ocr": ocr_results,
+                "lines": reconstructed_lines,
+                "corrected_text": corrected_text,
+            })
 
         # ==========================================================
         # Pipeline completed
         # ==========================================================
+        # ==========================================================
+        # Extract structured fields from the complete dossier
+        # ==========================================================
 
+        corrected_pages = [
+            page["corrected_text"]
+            for page in processed_pages
+        ]
+
+        extracted_fields = self.extractor.extract(corrected_pages)
+
+        print("\n===== Extracted Fields =====\n")
+        print(
+            json.dumps(
+            extracted_fields,
+            indent=4,
+            ensure_ascii=False,
+        )
+    )
         print("\n✓ Preprocessing completed successfully.")
 
-        return processed_pages
+        return {
+            "pages": processed_pages,
+            "fields": extracted_fields,
+        }
