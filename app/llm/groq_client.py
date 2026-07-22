@@ -7,12 +7,6 @@ Current capabilities
 --------------------
 - OCR correction
 - Banking field extraction
-
-Future capabilities
--------------------
-- Document classification
-- Document summarization
-- Validation
 """
 
 from groq import Groq  # pyright: ignore[reportMissingImports]

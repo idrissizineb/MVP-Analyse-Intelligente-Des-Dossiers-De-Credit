@@ -170,16 +170,6 @@ class Denoiser:
         if self.method == "nlm":
             return self._non_local_means(image)
 
-        elif self.method == "median":
-            return self._median(image)
-
-        elif self.method == "gaussian":
-            return self._gaussian(image)
-
-        elif self.method == "bilateral":
-            return self._bilateral(image)
-
-        raise RuntimeError("Unexpected denoising method.")
 
     def _non_local_means(self, image: np.ndarray) -> np.ndarray:
         """
@@ -204,45 +194,3 @@ class Denoiser:
         )
 
         return denoised
-
-    def _median(self, image: np.ndarray) -> np.ndarray:
-        """
-        Apply Median Blur.
-
-        Returns
-        -------
-        np.ndarray
-            Denoised image.
-        """
-
-        raise NotImplementedError(
-            "Median Blur has not been implemented yet."
-        )
-
-    def _gaussian(self, image: np.ndarray) -> np.ndarray:
-        """
-        Apply Gaussian Blur.
-
-        Returns
-        -------
-        np.ndarray
-            Denoised image.
-        """
-
-        raise NotImplementedError(
-            "Gaussian Blur has not been implemented yet."
-        )
-
-    def _bilateral(self, image: np.ndarray) -> np.ndarray:
-        """
-        Apply Bilateral Filter.
-
-        Returns
-        -------
-        np.ndarray
-            Denoised image.
-        """
-
-        raise NotImplementedError(
-            "Bilateral Filter has not been implemented yet."
-        )

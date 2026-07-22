@@ -41,12 +41,6 @@ class DocumentLoader:
         """
         return self.file_path.suffix.lower() == ".pdf"
 
-    def get_extension(self) -> str:
-        """
-        Returns the file extension.
-        """
-        return self.file_path.suffix.lower()
-
     def get_path(self) -> Path:
         """
         Returns the validated file path.

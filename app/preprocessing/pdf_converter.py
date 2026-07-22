@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import List
 from app.config import POPPLER_PATH
-from pdf2image import convert_from_path
+from pdf2image import convert_from_path  # pyright: ignore[reportMissingImports]
 from PIL import Image
 
 
@@ -15,11 +15,6 @@ class PDFConverter:
         - Validate that the file is a PDF.
         - Convert every page into a PIL Image.
         - Return the images.
-
-    This class DOES NOT:
-        - preprocess images
-        - perform OCR
-        - save to database
     """
 
     def __init__(self, pdf_path: str | Path):

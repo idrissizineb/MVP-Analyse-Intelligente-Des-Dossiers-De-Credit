@@ -25,10 +25,7 @@ USE_GPU = False
 #Supported File Types
 
 SUPPORTED_EXTENSIONS = [
-    ".pdf",
-    ".jpg",
-    ".jpeg",
-    ".png"
+    ".pdf"
 ]
 #Future Database Configuration
 
