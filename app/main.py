@@ -28,7 +28,6 @@ def main():
     ):
 
         print(f"\n===== PAGE {page_number} =====\n")
-
         print(page["corrected_text"])
 
 

@@ -294,28 +294,6 @@ class DocumentPipeline:
                 ocr_text
             )
 
-            print(
-                "\n===== Corrected OCR =====\n"
-            )
-
-            print(
-                corrected_text
-            )
-
-            # ------------------------------------------------------
-            # Display reconstructed OCR text
-            # ------------------------------------------------------
-
-            print(
-                "\n===== Reconstructed Document ====="
-            )
-
-            for line in reconstructed_lines:
-
-                print(
-                    line
-                )
-
             # ======================================================
             # Step 4 - Save intermediate processing results
             # ======================================================
