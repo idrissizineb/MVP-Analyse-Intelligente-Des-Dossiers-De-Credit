@@ -1,8 +1,6 @@
 from pathlib import Path
-
 import cv2
 import json
-import numpy as np
 
 from app.preprocessing.loader import DocumentLoader
 from app.preprocessing.pdf_converter import PDFConverter
@@ -20,6 +18,8 @@ from app.postprocessing.text_reconstructor import TextReconstructor
 from app.llm.groq_client import GroqClient
 from app.llm.field_extractor import FieldExtractor
 
+from app.validation.validator import Validator
+
 
 class DocumentPipeline:
     """
@@ -28,30 +28,20 @@ class DocumentPipeline:
 
     Pipeline:
         1. Validate the input document
-        2. Convert the PDF into individual page images
+        2. Convert the PDF into page images
         3. Convert images to grayscale
         4. Correct document skew
         5. Remove image noise
-        6. Enhance image contrast using CLAHE
+        6. Enhance image contrast
         7. Resize images for OCR
-
         8. Perform OCR using PaddleOCR
-
-        9. Filter OCR results according to confidence scores
-       10. Sort detected text according to reading order
-       11. Reconstruct the detected text into readable lines
-
-       12. Correct OCR errors using Groq
-       13. Merge corrected text from all document pages
-       14. Extract structured banking fields using Groq
-       15. Return page-level OCR data and document-level fields
-
-    Current output:
-        - Processed page images
-        - Raw OCR results
-        - Reconstructed OCR text
-        - Corrected OCR text
-        - Extracted structured banking fields
+        9. Filter low-confidence OCR detections
+        10. Sort OCR results according to reading order
+        11. Reconstruct OCR detections into readable text
+        12. Correct OCR errors using the LLM
+        13. Extract structured banking fields
+        14. Validate the extracted fields
+        15. Return the complete processing results
     """
 
     def __init__(
@@ -69,8 +59,7 @@ class DocumentPipeline:
             Path to the input PDF document.
 
         output_dir : str
-            Directory where intermediate processing results
-            will be saved.
+            Directory used to save intermediate results.
 
         save_intermediate : bool
             Whether to save intermediate images and OCR results.
@@ -81,19 +70,16 @@ class DocumentPipeline:
         # ==========================================================
 
         self.pdf_path = pdf_path
-
         self.output_dir = Path(output_dir)
-
         self.save_intermediate = save_intermediate
 
-        # Create the output directory if it does not already exist.
         self.output_dir.mkdir(
             parents=True,
             exist_ok=True
         )
 
         # ==========================================================
-        # Initialize document loading and PDF conversion modules
+        # Document loading and PDF conversion
         # ==========================================================
 
         self.loader = DocumentLoader(
@@ -105,7 +91,7 @@ class DocumentPipeline:
         )
 
         # ==========================================================
-        # Initialize image preprocessing modules
+        # Image preprocessing
         # ==========================================================
 
         self.grayscale = GrayscaleConverter()
@@ -123,37 +109,36 @@ class DocumentPipeline:
         )
 
         # ==========================================================
-        # Initialize OCR module
+        # OCR
         # ==========================================================
 
         self.ocr = PaddleOCRProcessor()
 
         # ==========================================================
-        # Initialize OCR post-processing modules
+        # OCR post-processing
         # ==========================================================
 
-        # Keep only OCR detections whose confidence score
-        # is at least 70%.
         self.postprocessor = OCRPostProcessor(
             min_confidence=0.70
         )
 
-        # Reconstruct individual OCR detections into
-        # readable text lines.
         self.reconstructor = TextReconstructor()
 
         # ==========================================================
-        # Initialize LLM modules
+        # LLM components
         # ==========================================================
 
-        # One shared Groq client is used by the different
-        # LLM-based components.
         self.groq = GroqClient()
 
-        # The field extractor receives the shared Groq client.
         self.extractor = FieldExtractor(
             self.groq
         )
+
+        # ==========================================================
+        # Validation
+        # ==========================================================
+
+        self.validator = Validator()
 
     def run(self) -> dict:
         """
@@ -162,16 +147,17 @@ class DocumentPipeline:
         Returns
         -------
         dict
-            A dictionary containing:
+            Dictionary containing:
 
-            - "pages":
-                Page-level processing results, including:
-                images, OCR results, reconstructed lines,
-                and corrected OCR text.
+            - pages:
+                Page-level OCR and processing results.
 
-            - "fields":
-                Structured banking information extracted
-                from the complete document.
+            - fields:
+                Structured banking fields extracted from
+                the complete document.
+
+            - validation:
+                Validation results for the extracted fields.
         """
 
         # ==========================================================
@@ -185,7 +171,7 @@ class DocumentPipeline:
         )
 
         # ==========================================================
-        # Step 2 - Convert the PDF into individual page images
+        # Step 2 - Convert the PDF into page images
         # ==========================================================
 
         pages = self.converter.convert()
@@ -194,12 +180,10 @@ class DocumentPipeline:
             f"✓ PDF converted into {len(pages)} page(s)."
         )
 
-        # This list will store the complete processing result
-        # for every page.
         processed_pages = []
 
         # ==========================================================
-        # Step 3 - Process every page independently
+        # Step 3 - Process each page independently
         # ==========================================================
 
         for page_number, page in enumerate(
@@ -212,90 +196,71 @@ class DocumentPipeline:
             )
 
             # ------------------------------------------------------
-            # Step 3.1 - Image preprocessing
+            # 3.1 Image preprocessing
             # ------------------------------------------------------
 
-            # Convert the page image to grayscale.
             gray_image = self.grayscale.convert(
                 page
             )
 
-            # Correct the document's geometric skew.
             deskewed_image = self.deskew.correct(
                 gray_image
             )
 
-            # Reduce image noise while preserving text details.
             denoised_image = self.denoiser.denoise(
                 deskewed_image
             )
 
-            # Enhance local image contrast using CLAHE.
             contrast_image = self.contrast.enhance(
                 denoised_image
             )
 
-            # Resize the image to an appropriate resolution
-            # for OCR processing.
             resized_image = self.resizer.resize(
                 contrast_image
             )
 
             # ------------------------------------------------------
-            # Step 3.2 - OCR
+            # 3.2 OCR
             # ------------------------------------------------------
 
-            # Detect and recognize text using PaddleOCR.
             ocr_results = self.ocr.recognize(
                 resized_image
             )
 
             # ------------------------------------------------------
-            # Step 3.3 - OCR post-processing
+            # 3.3 OCR post-processing
             # ------------------------------------------------------
 
-            # Remove low-confidence OCR detections.
             ocr_results = self.postprocessor.filter_confidence(
                 ocr_results
             )
 
-            # Sort the remaining OCR detections according
-            # to their spatial reading order.
             ocr_results = self.postprocessor.sort_reading_order(
                 ocr_results
             )
 
             # ------------------------------------------------------
-            # Step 3.4 - Text reconstruction
+            # 3.4 Text reconstruction
             # ------------------------------------------------------
 
-            # Reconstruct individual OCR detections into
-            # readable text lines.
             reconstructed_lines = self.reconstructor.reconstruct(
                 ocr_results
             )
-
-            # ------------------------------------------------------
-            # Step 3.5 - Convert reconstructed lines into one
-            # text block
-            # ------------------------------------------------------
 
             ocr_text = "\n".join(
                 reconstructed_lines
             )
 
             # ------------------------------------------------------
-            # Step 3.6 - Correct OCR errors using Groq
+            # 3.5 OCR correction
             # ------------------------------------------------------
 
-            # Groq corrects linguistic and formatting errors
-            # while preserving the original information.
             corrected_text = self.groq.correct_ocr(
                 ocr_text
             )
 
             # ======================================================
-            # Step 4 - Save intermediate processing results
+            # Step 4 - Save intermediate results
             # ======================================================
 
             if self.save_intermediate:
@@ -330,8 +295,6 @@ class DocumentPipeline:
                     / f"page_{page_number}_ocr.json"
                 )
 
-                # Save intermediate images.
-
                 cv2.imwrite(
                     str(gray_path),
                     gray_image
@@ -357,8 +320,6 @@ class DocumentPipeline:
                     resized_image
                 )
 
-                # Save the final OCR detections after
-                # confidence filtering and reading-order sorting.
                 with open(
                     ocr_json_path,
                     "w",
@@ -371,10 +332,6 @@ class DocumentPipeline:
                         indent=4,
                         ensure_ascii=False
                     )
-
-                print(
-                    f"✓ Saved: {ocr_json_path.name}"
-                )
 
                 print(
                     f"✓ Saved: {gray_path.name}"
@@ -396,24 +353,19 @@ class DocumentPipeline:
                     f"✓ Saved: {resize_path.name}"
                 )
 
+                print(
+                    f"✓ Saved: {ocr_json_path.name}"
+                )
+
             # ======================================================
-            # Step 5 - Store the processed page
+            # Step 5 - Store page processing results
             # ======================================================
 
             processed_pages.append(
                 {
-                    # Preprocessed image used by PaddleOCR.
                     "image": resized_image,
-
-                    # OCR detections after confidence filtering
-                    # and reading-order sorting.
                     "ocr": ocr_results,
-
-                    # Text reconstructed from OCR detections.
                     "lines": reconstructed_lines,
-
-                    # Text corrected by the Groq OCR
-                    # post-processing stage.
                     "corrected_text": corrected_text,
                 }
             )
@@ -428,12 +380,9 @@ class DocumentPipeline:
         ]
 
         # ==========================================================
-        # Step 7 - Extract structured fields from the complete
-        # document
+        # Step 7 - Extract structured banking fields
         # ==========================================================
 
-        # The corrected text from all pages is sent to the
-        # field extraction module.
         extracted_fields = self.extractor.extract(
             corrected_pages
         )
@@ -451,6 +400,26 @@ class DocumentPipeline:
         )
 
         # ==========================================================
+        # Step 8 - Validate extracted fields
+        # ==========================================================
+
+        validation_result = self.validator.validate(
+            extracted_fields
+        )
+
+        print(
+            "\n===== Validation Results =====\n"
+        )
+
+        print(
+            json.dumps(
+                validation_result,
+                indent=4,
+                ensure_ascii=False
+            )
+        )
+
+        # ==========================================================
         # Pipeline completed
         # ==========================================================
 
@@ -458,9 +427,8 @@ class DocumentPipeline:
             "\n✓ Document processing pipeline completed successfully."
         )
 
-        # Return both page-level processing results and
-        # document-level extracted fields.
         return {
             "pages": processed_pages,
             "fields": extracted_fields,
+            "validation": validation_result,
         }
