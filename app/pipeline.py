@@ -20,6 +20,10 @@ from app.llm.field_extractor import FieldExtractor
 
 from app.validation.validator import Validator
 
+from app.normalization.normalizer import Normalizer
+from data.database.connection import DatabaseConnection  # pyright: ignore[reportMissingImports]
+from data.database.database_manager import DatabaseManager  # pyright: ignore[reportMissingImports]
+
 
 class DocumentPipeline:
     """
@@ -140,6 +144,12 @@ class DocumentPipeline:
 
         self.validator = Validator()
 
+        self.normalizer = Normalizer()
+
+        self.database_connection = DatabaseConnection()
+
+        self.database_manager = DatabaseManager(database_connection=self.database_connection)
+
     def run(self) -> dict:
         """
         Execute the complete document processing pipeline.
@@ -159,6 +169,8 @@ class DocumentPipeline:
             - validation:
                 Validation results for the extracted fields.
         """
+
+        self.database_manager.initialize_database()
 
         # ==========================================================
         # Step 1 - Validate the input document
@@ -420,6 +432,14 @@ class DocumentPipeline:
         )
 
         # ==========================================================
+        # Stepp 9 - Normalization
+        # ==========================================================
+
+        normalized_fields = self.normalizer.normalize(extracted_fields)
+
+        dossier_id = self.database_manager.save_credit_dossier(normalized_fields)
+
+        # ==========================================================
         # Pipeline completed
         # ==========================================================
 
@@ -431,4 +451,6 @@ class DocumentPipeline:
             "pages": processed_pages,
             "fields": extracted_fields,
             "validation": validation_result,
+            "normalized_fields": normalized_fields,
+            "dossier_id": dossier_id,
         }

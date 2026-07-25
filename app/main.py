@@ -13,6 +13,8 @@ def main():
     processed_pages = result["pages"]
     extracted_fields = result["fields"]
     validation_result = result["validation"]
+    normalized_fields = result["normalized_fields"]
+    dossier_id = result["dossier_id"]
 
     print(
         f"\nTotal processed pages: "
@@ -33,33 +35,56 @@ def main():
         "\n========== VALIDATION RESULTS ==========\n"
     )
 
-    for field, result in validation_result["fields"].items():
+    for field, field_result in validation_result["fields"].items():
 
         print(
             f"{field}:"
         )
 
         print(
-            f"  Value: {result['value']}"
+            f"  Value: "
+            f"{field_result['value']}"
         )
-
-        status = result["status"]
 
         print(
-            f"  Status: {status}"
+            f"  Status: "
+            f"{field_result['status']}"
         )
 
-        if result["error"]:
+        if field_result["error"]:
 
             print(
-                f"  Error: {result['error']}"
+                f"  Error: "
+                f"{field_result['error']}"
             )
 
         print()
 
     print(
-        f"Overall document validity: "
+        "Overall document validity: "
         f"{validation_result['is_valid']}"
+    )
+
+    print(
+        "\n========== NORMALIZED FIELDS ==========\n"
+    )
+
+    for field, value in normalized_fields.items():
+
+        print(
+            f"{field}: {value}"
+        )
+
+    print(
+        "\n========== DATABASE ==========\n"
+    )
+
+    print(
+        "Credit dossier saved successfully."
+    )
+
+    print(
+        f"Dossier ID: {dossier_id}"
     )
 
     print(
@@ -81,4 +106,5 @@ def main():
 
 
 if __name__ == "__main__":
+
     main()
