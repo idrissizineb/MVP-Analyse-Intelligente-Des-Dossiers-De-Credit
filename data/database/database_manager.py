@@ -349,3 +349,41 @@ class DatabaseManager:
         )
 
         return dossier_id
+
+    def get_dossier(
+        self,
+        dossier_id: int
+    ):
+        """
+        Retrieve a credit dossier by its identifier.
+
+        Parameters
+        ----------
+        dossier_id : int
+            Identifier of the credit dossier.
+
+        Returns
+        -------
+        tuple | None
+            The dossier row if found, otherwise None.
+        """
+
+        query = """
+        SELECT
+            dossier_id,
+            client_id,
+            numero_compte,
+            nature_credit,
+            montant_credit,
+            date_production,
+            date_archivage,
+            statut,
+            created_at
+        FROM dossier_credit
+        WHERE dossier_id = ?
+        """
+
+        return self.database_connection.fetch_one(
+                query,
+                (dossier_id,)
+            )

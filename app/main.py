@@ -87,6 +87,52 @@ def main():
         f"Dossier ID: {dossier_id}"
     )
 
+    stored_dossier = pipeline.database_manager.get_dossier(dossier_id)
+
+    print(
+        "\n========== STORED DOSSIER ==========\n"
+    )
+
+    if stored_dossier:
+
+        print(
+            f"Dossier ID: {stored_dossier[0]}"
+        )
+
+        print(
+            f"Client ID: {stored_dossier[1]}"
+        )
+
+        print(
+            f"Account Number: {stored_dossier[2]}"
+        )
+
+        print(
+            f"Credit Type: {stored_dossier[3]}"
+        )
+
+        print(
+            f"Amount: {stored_dossier[4]}"
+        )
+
+        print(
+            f"Production Date: {stored_dossier[5]}"
+        )
+
+        print(
+            f"Archive Date: {stored_dossier[6]}"
+        )
+
+        print(
+            f"Status: {stored_dossier[7]}"
+        )
+
+    else:
+
+        print(
+            "Dossier not found."
+        )
+
     print(
         "\n========== OCR RESULTS ==========\n"
     )
