@@ -5,7 +5,7 @@ This module initializes and manages the database schema.
 """
 
 from data.database.connection import DatabaseConnection  # pyright: ignore[reportMissingImports]
-from data.database.models import ( CREATE_CLIENT_TABLE, CREATE_DOSSIER_CREDIT_TABLE)  # pyright: ignore[reportMissingImports]
+from data.database.models import ( CREATE_CLIENT_TABLE, CREATE_DOSSIER_CREDIT_TABLE, CREATE_DOCUMENT_TABLE, CREATE_DOCUMENT_PAGE_TABLE)  # pyright: ignore[reportMissingImports]
 
 
 class DatabaseManager:
@@ -40,6 +40,10 @@ class DatabaseManager:
         cursor.execute(CREATE_CLIENT_TABLE)
 
         cursor.execute(CREATE_DOSSIER_CREDIT_TABLE)
+
+        cursor.execute(CREATE_DOCUMENT_TABLE)
+
+        cursor.execute(CREATE_DOCUMENT_PAGE_TABLE)
 
         connection.commit()
 
@@ -387,3 +391,200 @@ class DatabaseManager:
                 query,
                 (dossier_id,)
             )
+
+    def create_document(
+        self,
+        dossier_id: int,
+        nom_fichier: str,
+        type_document: str | None,
+        nombre_pages: int,
+        chemin_fichier: str
+    ) -> int:
+        """
+        Create a document associated with an existing credit dossier.
+
+        Parameters
+        ----------
+        dossier_id : int
+            ID of the credit dossier containing the document.
+
+        nom_fichier : str
+            Original name of the document file.
+
+        type_document : str | None
+            Type of document, if known.
+
+        nombre_pages : int
+            Number of pages in the document.
+
+        chemin_fichier : str
+            Path to the original document.
+
+        Returns
+        -------
+        int
+            ID of the created document.
+        """
+
+        connection = self.database_connection.connect()
+
+        cursor = connection.cursor()
+
+        cursor.execute(
+            """
+            INSERT INTO document (
+                dossier_id,
+                nom_fichier,
+                type_document,
+                nombre_pages,
+                chemin_fichier
+            )
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                dossier_id,
+                nom_fichier,
+                type_document,
+                nombre_pages,
+                chemin_fichier
+            )
+        )
+
+        connection.commit()
+
+        document_id = cursor.lastrowid
+
+        cursor.close()
+
+        return document_id
+
+    def get_document(
+        self,
+        document_id: int
+    ) -> tuple | None:
+        """
+        Retrieve a document by its identifier.
+
+        Parameters
+        ----------
+        document_id : int
+            Unique identifier of the document.
+
+        Returns
+        -------
+        tuple | None
+            Document record if found, otherwise None.
+        """
+
+        connection = self.database_connection.connect()
+
+        cursor = connection.cursor()
+
+        cursor.execute(
+            """
+            SELECT
+                document_id,
+                dossier_id,
+                nom_fichier,
+                type_document,
+                nombre_pages,
+                chemin_fichier,
+                created_at
+            FROM document
+            WHERE document_id = ?
+            """,
+            (document_id,)
+        )
+
+        document = cursor.fetchone()
+
+        cursor.close()
+
+        return document
+
+
+    def create_document_page(
+        self,
+        document_id: int,
+        numero_page: int,
+        chemin_image: str
+    ) -> int:
+        """
+        Create a page associated with a document.
+
+        Parameters
+        ----------
+        document_id : int
+            ID of the parent document.
+
+        numero_page : int
+            Page number inside the document.
+
+        chemin_image : str
+            Path to the processed page image.
+
+        Returns
+        -------
+        int
+            ID of the created page.
+        """
+
+        connection = self.database_connection.connect()
+
+        cursor = connection.cursor()
+
+        cursor.execute(
+            """
+            INSERT INTO document_page (
+                document_id,
+                numero_page,
+                chemin_image
+            )
+            VALUES (?, ?, ?)
+            """,
+            (
+                document_id,
+                numero_page,
+                chemin_image
+            )
+        )
+
+        connection.commit()
+
+        page_id = cursor.lastrowid
+
+        cursor.close()
+
+        return page_id
+
+    def get_document_page(
+        self,
+        page_id: int
+    ) -> tuple | None:
+        """
+        Retrieve a document page by its identifier.
+        """
+
+        connection = self.database_connection.connect()
+
+        cursor = connection.cursor()
+
+        cursor.execute(
+            """
+            SELECT
+                page_id,
+                document_id,
+                numero_page,
+                chemin_image,
+                created_at
+            FROM document_page
+            WHERE page_id = ?
+            """,
+            (page_id,)
+        )
+
+        page = cursor.fetchone()
+
+        cursor.close()
+
+        return page

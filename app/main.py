@@ -11,6 +11,9 @@ def main():
     result = pipeline.run()
 
     processed_pages = result["pages"]
+
+    print(processed_pages[0])
+
     extracted_fields = result["fields"]
     validation_result = result["validation"]
     normalized_fields = result["normalized_fields"]
@@ -132,6 +135,10 @@ def main():
         print(
             "Dossier not found."
         )
+
+    print(
+        f"Document ID: {result['document_id']}"
+    )
 
     print(
         "\n========== OCR RESULTS ==========\n"
