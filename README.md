@@ -1,50 +1,34 @@
-# 📄 Intelligent Credit File Analysis System
-
-> An AI-powered document processing pipeline for automating the analysis of banking credit files.
-
-![Python](https://img.shields.io/badge/Python-3.10+-blue)
-![OpenCV](https://img.shields.io/badge/OpenCV-4.x-green)
-![License](https://img.shields.io/badge/License-MIT-yellow)
-![Status](https://img.shields.io/badge/Status-In%20Development-orange)
-
----
-
 # 📖 Overview
 
-This project aims to automate the analysis of banking credit files by transforming scanned PDF documents into structured digital information.
+Intelligent Credit File Analysis System is an AI-powered Intelligent Document Processing (IDP) platform developed to automate the analysis of banking credit files.
 
-The system is designed to process various banking documents such as:
+The system transforms scanned banking documents into structured digital information through an end-to-end pipeline combining computer vision, Optical Character Recognition (OCR), Large Language Models (LLMs), data validation, normalization, and database integration.
 
-- National Identity Cards
-- Salary Certificates
-- Bank Statements
-- Tax Documents
-- Employment Certificates
-- Credit Application Files
+Current capabilities include:
 
-The preprocessing pipeline prepares scanned documents for Optical Character Recognition (OCR), ensuring higher text recognition accuracy before information extraction.
+- PDF preprocessing
+- OCR using PaddleOCR
+- OCR correction using Groq LLM
+- Automatic extraction of key banking fields
+- Field validation
+- Data normalization
+- Automatic storage in a relational SQLite database
 
-The project is being developed as part of an AI Engineering internship at **Banque Populaire Morocco**.
-
----
+The project is being developed during an AI Engineering internship at Banque Populaire Morocco and will later evolve into a Retrieval-Augmented Generation (RAG) assistant for intelligent document querying.
 
 # 🎯 Objectives
 
-The main objectives are:
+The project aims to:
 
-- Convert PDF documents into high-quality images.
-- Improve scanned document quality using image preprocessing.
-- Increase OCR accuracy.
-- Automatically extract relevant information from banking documents.
+- Automate the processing of banking credit documents.
+- Improve OCR accuracy using image preprocessing.
+- Correct OCR errors using a Large Language Model.
+- Extract critical banking information automatically.
 - Validate extracted information.
-- Store structured data for further processing.
-- Build a Retrieval-Augmented Generation (RAG) system for intelligent document querying.
+- Normalize banking data.
+- Store both structured data and complete OCR text.
+- Build an intelligent RAG assistant for banking document search and question answering.
 
----
-
-# 🏗️ Current Project Architecture
-
-```
 app/
 │
 ├── main.py
@@ -59,386 +43,217 @@ app/
 │   ├── contrast.py
 │   └── resize.py
 │
-├── data/
-│   ├── raw/
-│   └── processed/
+├── ocr/
+│   └── paddle_ocr.py
 │
-└── utils/
-```
+├── postprocessing/
+│   ├── ocr_postprocessor.py
+│   └── text_reconstructor.py
+│
+├── llm/
+│   ├── groq_client.py
+│   └── field_extractor.py
+│
+├── validation/
+│   └── validator.py
+│
+├── normalization/
+│   └── normalizer.py
+│
+data/
+│
+├── database/
+│   ├── connection.py
+│   ├── database_manager.py
+│   └── models.py
+│
+├── input/
+└── processed/
 
----
-
-# ⚙️ Current Processing Pipeline
-
-```
-PDF Document
+PDF Documents
       │
       ▼
 Document Validation
       │
       ▼
-PDF → Image Conversion
+PDF → Images
       │
       ▼
-Grayscale Conversion
+Grayscale
       │
       ▼
-Skew Detection & Correction
+Deskew
       │
       ▼
 Noise Removal
       │
       ▼
-Contrast Enhancement (CLAHE)
+Contrast Enhancement
       │
       ▼
-Image Resizing
+Resize
       │
       ▼
-Processed Images
-```
+PaddleOCR
+      │
+      ▼
+OCR Confidence Filtering
+      │
+      ▼
+Reading Order Reconstruction
+      │
+      ▼
+LLM OCR Correction
+      │
+      ▼
+Field Extraction
+      │
+      ▼
+Validation
+      │
+      ▼
+Normalization
+      │
+      ▼
+SQLite Database
+      │
+      ▼
+Future RAG Assistant
 
----
+# 🗄️ Database
 
-# 📚 Preprocessing Modules
+The project stores all processed information inside a relational SQLite database.
 
-## 1. Document Loader
+Current schema:
 
-Responsible for:
+- client
+- dossier_credit
+- document
+- document_page
+- ocr_results
+- extracted_fields
+- validation_results
 
-- validating the document path
-- checking supported file formats
-- ensuring the document exists
+Each processed PDF automatically populates the database.
 
----
+# 🔎 OCR
 
-## 2. PDF Converter
+OCR is performed using PaddleOCR.
 
-Uses **pdf2image** to convert PDF pages into OpenCV images.
+The OCR pipeline includes:
 
-Output:
+- Text detection
+- Text recognition
+- Confidence filtering
+- Reading-order reconstruction
+- OCR correction using Groq LLM
 
-```
-PDF
+Both raw OCR output and corrected text are stored in the database.
 
-↓
+# 🤖 Large Language Model
 
-List[np.ndarray]
-```
+The project uses Groq API to:
 
----
+- Correct OCR mistakes
+- Extract structured banking information
 
-## 3. Grayscale Conversion
+Future versions will also use the LLM as part of the RAG system.
 
-Converts RGB images into grayscale.
+## Core
 
-Benefits:
-
-- reduces computational cost
-- removes unnecessary color information
-- improves OCR preprocessing
-
----
-
-## 4. Deskew Correction
-
-Automatically detects page rotation using the Hough Transform.
-
-Corrects:
-
-- scanned documents
-- slightly rotated pages
-- misaligned text
-
----
-
-## 5. Noise Removal
-
-Uses **Non-Local Means Denoising**.
-
-Advantages:
-
-- preserves text edges
-- removes scanner noise
-- reduces compression artifacts
-
----
-
-## 6. Contrast Enhancement
-
-Uses **CLAHE (Contrast Limited Adaptive Histogram Equalization)**.
-
-Advantages:
-
-- improves faint text
-- increases OCR readability
-- preserves local document details
-- avoids over-enhancement
-
----
-
-## 7. Image Resizing
-
-Upscales low-resolution images while preserving the aspect ratio.
-
-Interpolation:
-
-```
-cv2.INTER_LANCZOS4
-```
-
-Benefits:
-
-- improves OCR accuracy
-- avoids unnecessary resizing
-- maintains document proportions
-
----
-
-# 🛠️ Technologies Used
-
-- Python 3.10+
+- Python 3.10
 - OpenCV
 - NumPy
 - pdf2image
-- Poppler
-- pathlib
+- SQLite
 
-Future technologies:
+## OCR
 
 - PaddleOCR
 - PaddlePaddle
-- FastAPI
-- SQLite / PostgreSQL
+
+## AI
+
+- Groq API
+- LLM Prompt Engineering
+
+## Future
+
 - LangChain
 - FAISS
-- HuggingFace Transformers
-
----
-
-# 🚀 Installation
-
-## Clone the repository
-
-```bash
-git clone https://github.com/yourusername/intelligent-credit-analysis.git
-
-cd intelligent-credit-analysis
-```
-
----
-
-## Create a virtual environment
-
-Windows
-
-```bash
-python -m venv .venv
-
-.venv\Scripts\activate
-```
-
-Linux
-
-```bash
-python3 -m venv .venv
-
-source .venv/bin/activate
-```
-
----
-
-## Install dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
----
-
-## Install Poppler
-
-This project requires **Poppler** for PDF conversion.
-
-Download Poppler for Windows and add the `bin` directory to your system PATH.
-
----
+- SentenceTransformers
 
 # ▶️ Running the Project
 
-Place your PDF inside:
+Place one or more PDF files inside:
 
-```
-data/raw/
-```
+data/input/
 
-Then execute:
+Run:
 
-```bash
 python -m app.main
-```
 
----
+Each PDF will automatically:
 
-# 📂 Output
-
-During development, intermediate preprocessing results are automatically saved.
-
-Example:
-
-```
-data/
-│
-├── processed/
-│   ├── page_1_gray.png
-│   ├── page_1_deskew.png
-│   ├── page_1_denoised.png
-│   ├── page_1_contrast.png
-│   └── page_1_resized.png
-```
-
-These images allow visual verification of every preprocessing stage.
-
----
-
-# 🧩 Design Principles
-
-The project follows a modular architecture.
-
-Each module has **one responsibility only**.
-
-Example:
-
-| Module | Responsibility |
-|----------|----------------|
-| Loader | Validate documents |
-| PDF Converter | Convert PDF pages |
-| Grayscale | RGB → Grayscale |
-| Deskew | Correct rotation |
-| Denoiser | Remove scanner noise |
-| Contrast | Improve readability |
-| Resize | Optimize resolution |
-
-This modular design makes the pipeline:
-
-- scalable
-- maintainable
-- reusable
-- easy to test
-
----
+- be preprocessed
+- undergo OCR
+- have key fields extracted
+- be validated
+- be normalized
+- be stored in the SQLite database
 
 # 📈 Current Progress
 
 - [x] Project architecture
-- [x] Document validation
-- [x] PDF conversion
-- [x] Grayscale preprocessing
-- [x] Automatic deskew correction
-- [x] Noise removal
-- [x] Contrast enhancement
-- [x] Image resizing
-- [ ] OCR integration
-- [ ] Document classification
-- [ ] Information extraction
-- [ ] Data validation
-- [ ] Database integration
-- [ ] RAG system
+- [x] PDF preprocessing
+- [x] OCR integration (PaddleOCR)
+- [x] OCR post-processing
+- [x] OCR correction using LLM
+- [x] Banking field extraction
+- [x] Field validation
+- [x] Field normalization
+- [x] SQLite database integration
+- [x] Batch processing of multiple PDF documents
+- [ ] Search interface
+- [ ] Retrieval-Augmented Generation (RAG)
 
----
+## ✅ Phase 1 — Document Preprocessing
 
-# 🛣️ Roadmap
+Completed.
 
-## Phase 1 — Image Preprocessing ✅
+## ✅ Phase 2 — OCR
 
-- PDF loading
-- Image enhancement
-- Document normalization
+Completed.
 
----
+## ✅ Phase 3 — Information Extraction
 
-## Phase 2 — OCR
+Completed.
 
-- PaddleOCR integration
-- Text detection
-- Text recognition
-
----
-
-## Phase 3 — Information Extraction
-
-Automatic extraction of:
+Currently extracting:
 
 - Full Name
-- CIN
-- Date of Birth
-- Salary
-- Employer
-- Bank Account
-- Address
+- Account Number
+- Credit Type
+- Credit Amount
+- Production Date
+- Archive Date
 
----
+## ✅ Phase 4 — Validation & Normalization
 
-## Phase 4 — Validation
+Completed.
 
-- Required fields
-- Format validation
-- Missing information detection
+## ✅ Phase 5 — Database
 
----
+Completed.
 
-## Phase 5 — Database
+## 🔄 Phase 6 — Search Interface
 
-Store extracted information into a structured database.
+Search client dossiers by:
 
----
+- Client name
+- (Future) National ID (CIN)
 
-## Phase 6 — Retrieval-Augmented Generation (RAG)
+## 🚀 Phase 7 — Retrieval-Augmented Generation (RAG)
 
-Create an intelligent assistant capable of answering questions such as:
+Allow users to ask natural-language questions about processed banking documents using the stored OCR text.
 
-> "Show me all salary certificates submitted after January 2025."
-
-> "What is the monthly salary declared in this file?"
-
----
-
-# 📊 Future Improvements
-
-- Multi-language OCR
-- Signature detection
-- Stamp detection
-- QR Code extraction
-- Barcode recognition
-- Handwritten text recognition
-- Automatic document classification
-- Batch document processing
-
----
-
-# 🤝 Contributing
-
-Contributions, suggestions, and improvements are welcome.
-
-1. Fork the repository.
-2. Create a feature branch.
-3. Commit your changes.
-4. Open a Pull Request.
-
----
-
-# 📄 License
-
-This project is released under the MIT License.
-
----
-
-# 👩‍💻 Author
-
-**Zineb Idrissi**
-
-Master's Student in Artificial Intelligence & IOT
-
-Université Ibn Tofaïl – Morocco
-
-AI Engineering Intern @ Banque Populaire Morocco
