@@ -1,161 +1,69 @@
+from pathlib import Path
+
 from app.pipeline import DocumentPipeline
 
 
 def main():
 
-    pipeline = DocumentPipeline(
-        pdf_path="data/input/FICHE DE DECISION TEST.pdf",
-        save_intermediate=True
-    )
+    input_folder = Path("data/input")
 
-    result = pipeline.run()
+    pdf_files = sorted(input_folder.glob("*.pdf"))
 
-    processed_pages = result["pages"]
+    if not pdf_files:
 
-    print(processed_pages[0])
+        print("No PDF files found.")
 
-    extracted_fields = result["fields"]
-    validation_result = result["validation"]
-    normalized_fields = result["normalized_fields"]
-    dossier_id = result["dossier_id"]
+        return
 
-    print(
-        f"\nTotal processed pages: "
-        f"{len(processed_pages)}"
-    )
+    print("=" * 60)
+    print(f"{len(pdf_files)} PDF(s) found.")
+    print("=" * 60)
 
-    print(
-        "\n========== EXTRACTED FIELDS ==========\n"
-    )
+    for pdf_file in pdf_files:
 
-    for field, value in extracted_fields.items():
+        print("\n" + "=" * 60)
+        print(f"PROCESSING: {pdf_file.name}")
+        print("=" * 60)
 
-        print(
-            f"{field}: {value}"
+        pipeline = DocumentPipeline(
+            pdf_path=str(pdf_file),
+            save_intermediate=True
         )
 
-    print(
-        "\n========== VALIDATION RESULTS ==========\n"
-    )
+        try:
 
-    for field, field_result in validation_result["fields"].items():
+            result = pipeline.run()
 
-        print(
-            f"{field}:"
-        )
+        except Exception as error:
 
-        print(
-            f"  Value: "
-            f"{field_result['value']}"
-        )
+            print(f"\n❌ Error while processing {pdf_file.name}")
+            print(error)
 
-        print(
-            f"  Status: "
-            f"{field_result['status']}"
-        )
+            continue
 
-        if field_result["error"]:
+        print("\n========== SUMMARY ==========\n")
 
-            print(
-                f"  Error: "
-                f"{field_result['error']}"
-            )
+        print(f"Document : {pdf_file.name}")
 
-        print()
+        print(f"Dossier ID : {result['dossier_id']}")
 
-    print(
-        "Overall document validity: "
-        f"{validation_result['is_valid']}"
-    )
+        print(f"Document ID : {result['document_id']}")
 
-    print(
-        "\n========== NORMALIZED FIELDS ==========\n"
-    )
+        print("\nExtracted Fields:\n")
 
-    for field, value in normalized_fields.items():
+        for field, value in result["fields"].items():
 
-        print(
-            f"{field}: {value}"
-        )
+            print(f"{field}: {value}")
 
-    print(
-        "\n========== DATABASE ==========\n"
-    )
+        print("\nValidation:")
 
-    print(
-        "Credit dossier saved successfully."
-    )
+        print(result["validation"]["is_valid"])
 
-    print(
-        f"Dossier ID: {dossier_id}"
-    )
+        print("\nFinished.")
 
-    stored_dossier = pipeline.database_manager.get_dossier(dossier_id)
-
-    print(
-        "\n========== STORED DOSSIER ==========\n"
-    )
-
-    if stored_dossier:
-
-        print(
-            f"Dossier ID: {stored_dossier[0]}"
-        )
-
-        print(
-            f"Client ID: {stored_dossier[1]}"
-        )
-
-        print(
-            f"Account Number: {stored_dossier[2]}"
-        )
-
-        print(
-            f"Credit Type: {stored_dossier[3]}"
-        )
-
-        print(
-            f"Amount: {stored_dossier[4]}"
-        )
-
-        print(
-            f"Production Date: {stored_dossier[5]}"
-        )
-
-        print(
-            f"Archive Date: {stored_dossier[6]}"
-        )
-
-        print(
-            f"Status: {stored_dossier[7]}"
-        )
-
-    else:
-
-        print(
-            "Dossier not found."
-        )
-
-    print(
-        f"Document ID: {result['document_id']}"
-    )
-
-    print(
-        "\n========== OCR RESULTS ==========\n"
-    )
-
-    for page_number, page in enumerate(
-        processed_pages,
-        start=1
-    ):
-
-        print(
-            f"\n===== PAGE {page_number} =====\n"
-        )
-
-        print(
-            page["corrected_text"]
-        )
+    print("\n" + "=" * 60)
+    print("ALL DOCUMENTS HAVE BEEN PROCESSED")
+    print("=" * 60)
 
 
 if __name__ == "__main__":

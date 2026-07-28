@@ -927,3 +927,109 @@ class DatabaseManager:
             )
 
         return validation_ids
+
+
+    def get_ocr_results_by_document(
+        self,
+        document_id: int
+    ) -> list[tuple]:
+
+        connection = self.database_connection.connect()
+
+        cursor = connection.cursor()
+
+        cursor.execute(
+            """
+            SELECT
+                o.ocr_result_id,
+                o.page_id,
+                o.raw_text,
+                o.corrected_text,
+                o.raw_ocr_json,
+                o.average_confidence,
+                o.ocr_engine,
+                o.created_at
+            FROM ocr_results o
+            JOIN document_page p
+                ON o.page_id = p.page_id
+            WHERE p.document_id = ?
+            ORDER BY p.numero_page
+            """,
+            (
+                document_id,
+            )
+        )
+
+        results = cursor.fetchall()
+
+        cursor.close()
+
+        return results
+
+    def get_extracted_fields_by_document(
+        self,
+        document_id: int
+    ) -> list[tuple]:
+
+        connection = self.database_connection.connect()
+
+        cursor = connection.cursor()
+
+        cursor.execute(
+            """
+            SELECT
+                extracted_field_id,
+                document_id,
+                field_name,
+                field_value,
+                normalized_value,
+                confidence,
+                created_at
+            FROM extracted_fields
+            WHERE document_id = ?
+            ORDER BY extracted_field_id
+            """,
+            (
+                document_id,
+            )
+        )
+
+        fields = cursor.fetchall()
+
+        cursor.close()
+
+        return fields
+
+    def get_validation_results_by_document(
+        self,
+        document_id: int
+    ) -> list[tuple]:
+
+        connection = self.database_connection.connect()
+
+        cursor = connection.cursor()
+
+        cursor.execute(
+            """
+            SELECT
+                validation_id,
+                document_id,
+                field_name,
+                field_value,
+                status,
+                error_message,
+                validated_at
+            FROM validation_results
+            WHERE document_id = ?
+            ORDER BY validation_id
+            """,
+            (
+                document_id,
+            )
+        )
+
+        results = cursor.fetchall()
+
+        cursor.close()
+
+        return results

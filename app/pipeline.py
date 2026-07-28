@@ -77,8 +77,13 @@ class DocumentPipeline:
         13. Extract structured banking fields
         14. Validate extracted fields
         15. Normalize extracted fields
-        16. Store data in the database
-        17. Return processing results
+        16. Save credit dossier in database
+        17. Save document in database
+        18. Save document pages in database
+        19. Save OCR results in database
+        20. Save extracted fields in database
+        21. Save validation results in database
+        22. Return processing results
     """
 
     def __init__(
@@ -89,17 +94,6 @@ class DocumentPipeline:
     ):
         """
         Initialize the document processing pipeline.
-
-        Parameters
-        ----------
-        pdf_path : str
-            Path to the input PDF document.
-
-        output_dir : str
-            Directory used to save intermediate files.
-
-        save_intermediate : bool
-            Whether to save intermediate images and OCR results.
         """
 
         # ======================================================
@@ -203,11 +197,6 @@ class DocumentPipeline:
 
         """
         Save an image to the output directory.
-
-        Returns
-        -------
-        str
-            Path to the saved image.
         """
 
         image_path = self.output_dir / filename
@@ -237,11 +226,6 @@ class DocumentPipeline:
 
         """
         Save data as JSON.
-
-        Returns
-        -------
-        str
-            Path to the saved JSON file.
         """
 
         json_path = self.output_dir / filename
@@ -273,11 +257,6 @@ class DocumentPipeline:
 
         """
         Process a single PDF page.
-
-        Returns
-        -------
-        dict
-            Page processing results.
         """
 
         print(
@@ -460,7 +439,7 @@ class DocumentPipeline:
             )
 
         # ======================================================
-        # RETURN CLEAN PAGE RESULT
+        # RETURN PAGE RESULT
         # ======================================================
 
         return {
@@ -487,11 +466,6 @@ class DocumentPipeline:
 
         """
         Execute the complete document processing pipeline.
-
-        Returns
-        -------
-        dict
-            Complete document processing results.
         """
 
         # ======================================================
@@ -626,7 +600,7 @@ class DocumentPipeline:
         )
 
         print(
-            f"Credit dossier saved successfully."
+            "Credit dossier saved successfully."
         )
 
         print(
@@ -656,13 +630,13 @@ class DocumentPipeline:
         )
 
         # ======================================================
-        # STEP 10 - SAVE DOCUMENT PAGES
+        # STEP 10 - SAVE DOCUMENT PAGES AND OCR RESULTS
         # ======================================================
 
         page_ids = []
 
         print(
-            "\n========== SAVING DOCUMENT PAGES =========="
+            "\n========== SAVING DOCUMENT PAGES AND OCR RESULTS =========="
         )
 
         for page in processed_pages:
@@ -682,6 +656,10 @@ class DocumentPipeline:
                 )
 
                 continue
+
+            # --------------------------------------------------
+            # SAVE DOCUMENT PAGE
+            # --------------------------------------------------
 
             page_id = self.database_manager.create_document_page(
 
@@ -705,6 +683,92 @@ class DocumentPipeline:
                 f"✓ Page ID: {page_id}"
             )
 
+            # --------------------------------------------------
+            # SAVE OCR RESULT
+            # --------------------------------------------------
+
+            raw_ocr_json = json.dumps(
+
+                page["ocr"],
+
+                ensure_ascii=False
+
+            )
+
+            ocr_result_id = self.database_manager.save_ocr_result(
+
+                page_id=page_id,
+
+                raw_text=page["reconstructed_text"],
+
+                corrected_text=page["corrected_text"],
+
+                raw_ocr_json=raw_ocr_json,
+
+                average_confidence=None,
+
+                ocr_engine="PaddleOCR"
+
+            )
+
+            print(
+                "✓ OCR result saved successfully."
+            )
+
+            print(
+                f"✓ OCR Result ID: {ocr_result_id}"
+            )
+
+        # ======================================================
+        # STEP 11 - SAVE EXTRACTED FIELDS
+        # ======================================================
+
+        print(
+            "\n========== SAVING EXTRACTED FIELDS =========="
+        )
+
+        extracted_field_ids = self.database_manager.save_extracted_fields(
+
+            document_id=document_id,
+
+            fields=extracted_fields,
+
+            normalized_fields=normalized_fields
+
+        )
+
+        print(
+            "✓ Extracted fields saved successfully."
+        )
+
+        print(
+            f"✓ Extracted field IDs: {extracted_field_ids}"
+        )
+
+        # ======================================================
+        # STEP 12 - SAVE VALIDATION RESULTS
+        # ======================================================
+
+        print(
+            "\n========== SAVING VALIDATION RESULTS =========="
+        )
+
+        validation_ids = self.database_manager.save_validation_results(
+
+            document_id=document_id,
+
+            validation_result=validation_result
+
+        )
+
+        print(
+            "✓ Validation results saved successfully."
+        )
+
+        print(
+            f"✓ Validation IDs: {validation_ids}"
+        )
+
         # ======================================================
         # FINAL RESULT
         # ======================================================
@@ -727,6 +791,10 @@ class DocumentPipeline:
 
             "document_id": document_id,
 
-            "page_ids": page_ids
+            "page_ids": page_ids,
+
+            "extracted_field_ids": extracted_field_ids,
+
+            "validation_ids": validation_ids
 
         }
