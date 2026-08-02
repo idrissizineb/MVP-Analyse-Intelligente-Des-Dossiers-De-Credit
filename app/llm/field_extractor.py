@@ -15,7 +15,7 @@ Workflow
 import json
 import re
 
-from app.llm.groq_client import GroqClient
+from app.llm.ollama_client import OllamaClient
 from app.llm.prompts import FIELD_EXTRACTION_PROMPT
 
 
@@ -24,7 +24,7 @@ class FieldExtractor:
     Extract structured banking fields from corrected OCR text.
     """
 
-    def __init__(self, client: GroqClient):
+    def __init__(self, client: OllamaClient):
         """
         Initialize the field extractor.
 

@@ -35,7 +35,7 @@ from app.postprocessing.text_reconstructor import TextReconstructor
 # LLM
 # ==========================================================
 
-from app.llm.groq_client import GroqClient
+from app.llm.ollama_client import OllamaClient
 from app.llm.field_extractor import FieldExtractor
 
 
@@ -161,10 +161,10 @@ class DocumentPipeline:
         # LLM
         # ======================================================
 
-        self.groq = GroqClient()
+        self.llm = OllamaClient()
 
         self.extractor = FieldExtractor(
-            self.groq
+            self.llm
         )
 
         # ======================================================
@@ -338,7 +338,7 @@ class DocumentPipeline:
 
         try:
 
-            corrected_text = self.groq.correct_ocr(
+            corrected_text = self.llm.correct_ocr(
                 reconstructed_text
             )
 
