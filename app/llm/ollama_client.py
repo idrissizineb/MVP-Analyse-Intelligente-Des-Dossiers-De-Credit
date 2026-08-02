@@ -97,3 +97,18 @@ class OllamaClient:
             user_prompt=document,
             temperature=0,
         )
+
+    def chat(
+        self,
+        prompt: str,
+        system_prompt: str | None = None,
+        temperature: float = 0.0,
+    ) -> str:
+        """Generic chat interface used by every LLM task."""
+
+
+        return self._generate(
+            system_prompt=system_prompt or "",
+            user_prompt=prompt,
+            temperature=temperature,
+        )
