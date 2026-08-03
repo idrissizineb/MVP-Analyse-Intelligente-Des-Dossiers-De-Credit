@@ -1,4 +1,7 @@
 import sqlite3
+from pathlib import Path
+
+
 
 
 class SchemaManager:
@@ -10,7 +13,7 @@ class SchemaManager:
 
     def __init__(self, database_path: str):
 
-        self.database_path = database_path
+        self.database_path = Path("data/database/credit_analysis.db")
 
     def get_schema(self) -> dict:
         """
