@@ -2,6 +2,7 @@ from app.text2sql.sql_generator import SQLGenerator
 from app.text2sql.sql_validator import SQLValidator
 from app.text2sql.sql_executor import SQLExecutor
 from app.text2sql.answer_generator import AnswerGenerator
+from app.text2sql.entity_extractor import EntityExtractor
 
 
 class Text2SQLPipeline:
@@ -32,6 +33,8 @@ class Text2SQLPipeline:
         )
 
         self.answer_generator = AnswerGenerator()
+
+        self.entity_extractor = EntityExtractor()
 
     def ask(
         self,
@@ -75,16 +78,10 @@ class Text2SQLPipeline:
         # STEP 3 - Execute SQL
         # =====================================================
 
-        results = self.sql_executor.execute(sql)
-        if len(results) == 0:
-            return {
-                "success": True,
-                "valid": valid,
-                "question": question,
-                "generated_sql": sql,
-                "results": [],
-                "answer": "Aucun résultat trouvé.",
-            }
+        parameters = self.entity_extractor.extract(question)
+        print("Parameters:", parameters)
+
+        results = self.sql_executor.execute(sql, parameters)
 
         # =====================================================
         # STEP 4 - Generate answer

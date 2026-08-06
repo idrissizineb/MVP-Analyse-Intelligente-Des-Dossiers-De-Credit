@@ -10,7 +10,7 @@ DATABASE SCHEMA
 {schema}
 
 ====================================================
-RULES
+GENERAL RULES
 ====================================================
 
 1. Generate ONLY valid SQLite syntax.
@@ -25,6 +25,7 @@ RULES
 - ALTER
 - CREATE
 - PRAGMA
+- REPLACE
 
 4. Never modify the database.
 
@@ -40,25 +41,72 @@ RULES
 
 10. Return ONLY the SQL query.
 
-11. All string comparisons must be case-insensitive using:
+11. All text comparisons must be case-insensitive using:
 
-UPPER(column) = UPPER(value)
+UPPER(column) = UPPER(parameter)
+
+====================================================
+CLIENT NAMES
+====================================================
+
+Client names are USER INPUT.
+
+They are NOT to be interpreted or corrected.
+
+If the user writes a client's name, you MUST preserve it exactly.
+
+NEVER:
+
+- correct spelling
+- normalize spelling
+- replace letters
+- remove letters
+- add letters
+- translate the name
+- capitalize the name
+- convert it to uppercase
+- convert it to lowercase
+- replace it with a more common spelling
+- guess the intended name
+
+Examples:
+
+User:
+Quel est le type de crédit de idrissi zineb ?
+
+The application must receive:
+
+client_name = "idrissi zineb"
+
+NOT:
+
+"idrisi zineb"
+
+NOT:
+
+"IDRISSI ZINEB"
+
+NOT:
+
+"Idrisi Zineb"
+
+NOT:
+
+"Idrissi Zineb"
+
+The exact sequence of characters written by the user must be preserved.
 
 ====================================================
 PARAMETERS
 ====================================================
 
-When filtering by a client's name (nom_prenom):
+When filtering by a client's name (nom_prenom), NEVER write the name directly inside the SQL.
 
-DO NOT write the client's name directly inside the SQL query.
-
-ALWAYS use the named SQLite parameter:
+ALWAYS use the SQLite named parameter:
 
 :client_name
 
 Example:
-
-Correct:
 
 SELECT d.montant_credit
 FROM dossier_credit d
@@ -66,17 +114,17 @@ JOIN client c
 ON d.client_id = c.client_id
 WHERE UPPER(c.nom_prenom) = UPPER(:client_name);
 
-Incorrect:
+Never generate:
 
-WHERE c.nom_prenom = 'TEST CLIENT'
+WHERE nom_prenom = 'TEST CLIENT'
 
-Incorrect:
+Never generate:
 
-WHERE UPPER(c.nom_prenom) = UPPER('TEST CLIENT')
+WHERE UPPER(nom_prenom)=UPPER('TEST CLIENT')
 
-Never copy, modify, correct, translate or normalize the client's name.
+Never generate any literal client name inside the SQL query.
 
-The application will provide the value of :client_name when executing the SQL query.
+The application will provide the value of :client_name during SQL execution.
 
 ====================================================
 OUTPUT FORMAT
