@@ -42,4 +42,7 @@ class SQLGenerator:
 
         )
 
+        print(question)
+        print(sql)
+
         return sql.strip()

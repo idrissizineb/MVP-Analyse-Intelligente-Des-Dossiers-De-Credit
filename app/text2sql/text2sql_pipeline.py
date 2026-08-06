@@ -76,6 +76,15 @@ class Text2SQLPipeline:
         # =====================================================
 
         results = self.sql_executor.execute(sql)
+        if len(results) == 0:
+            return {
+                "success": True,
+                "valid": valid,
+                "question": question,
+                "generated_sql": sql,
+                "results": [],
+                "answer": "Aucun résultat trouvé.",
+            }
 
         # =====================================================
         # STEP 4 - Generate answer

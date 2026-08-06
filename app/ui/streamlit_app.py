@@ -70,37 +70,65 @@ if page == "Analyse d'un dossier":
                 pdf_path = Path(tmp_file.name)
 
             # --------------------------------------------------
-            # Run pipeline
+            # Run pipeline safely
             # --------------------------------------------------
 
-            with st.spinner(
-                "Analyse du dossier en cours..."
-            ):
+            try:
 
-                pipeline = DocumentPipeline(
-                    pdf_path=str(pdf_path)
+                with st.spinner(
+                    "Analyse du dossier en cours..."
+                ):
+
+                    pipeline = DocumentPipeline(
+                        pdf_path=str(pdf_path)
+                    )
+
+                    results = pipeline.run()
+
+            except FileNotFoundError:
+
+                st.error(
+                    "❌ Impossible de trouver le fichier PDF."
+                )
+                st.stop()
+
+            except ConnectionError:
+
+                st.error(
+                    "❌ Impossible de communiquer avec Ollama."
                 )
 
-                results = pipeline.run()
+                st.info(
+                    "Vérifiez qu'Ollama est lancé puis réessayez."
+                )
+
+                st.stop()
+
+            except Exception as error:
+
+                st.error(
+                    "❌ Une erreur est survenue pendant l'analyse."
+                )
+
+                st.exception(error)
+
+                st.stop()
 
             # --------------------------------------------------
             # Display results
             # --------------------------------------------------
 
             st.success(
-                "Analyse terminée avec succès."
+                "✅ Analyse terminée avec succès."
             )
 
             st.subheader("Informations extraites")
-
             st.json(results["fields"])
 
             st.subheader("Validation")
-
             st.json(results["validation"])
 
             st.subheader("Valeurs normalisées")
-
             st.json(results["normalized_fields"])
 
             st.subheader("Base de données")
@@ -124,7 +152,7 @@ if page == "Analyse d'un dossier":
             st.divider()
 
             # --------------------------------------------------
-            # Ask immediately after analysis
+            # Ask questions immediately
             # --------------------------------------------------
 
             st.subheader(
@@ -141,30 +169,72 @@ if page == "Analyse d'un dossier":
                 key="analysis_query",
             ):
 
-                assistant = Text2SQLPipeline()
+                if question.strip() == "":
 
-                response = assistant.ask(question)
-                st.write(response)
-                st.stop()
+                    st.warning(
+                        "Veuillez saisir une question."
+                    )
 
-                st.subheader("SQL généré")
+                else:
 
-                st.code(
-                    response["generated_sql"],
-                    language="sql",
-                )
+                    try:
 
-                st.subheader("Résultats SQL")
+                        assistant = Text2SQLPipeline()
 
-                st.json(
-                    response["results"]
-                )
+                        response = assistant.ask(question)
 
-                st.subheader("Réponse")
+                    except ConnectionError:
 
-                st.success(
-                    response["answer"]
-                )
+                        st.error(
+                            "❌ Ollama n'est pas disponible."
+                        )
+
+                        st.stop()
+
+                    except Exception as error:
+
+                        st.error(
+                            "❌ Impossible de traiter votre question."
+                        )
+
+                        st.exception(error)
+
+                        st.stop()
+
+                    if not response.get("success", True):
+
+                        st.error(
+                            response["error"]
+                        )
+
+                        st.stop()
+
+                    if len(response["results"]) == 0:
+
+                        st.warning(
+                            "Aucun résultat trouvé."
+                        )
+
+                        st.stop()
+
+                    st.subheader("SQL généré")
+
+                    st.code(
+                        response["generated_sql"],
+                        language="sql",
+                    )
+
+                    st.subheader("Résultats SQL")
+
+                    st.json(
+                        response["results"]
+                    )
+
+                    st.subheader("Réponse")
+
+                    st.success(
+                        response["answer"]
+                    )
 
 
 # ==========================================================
@@ -193,9 +263,45 @@ else:
 
         else:
 
-            assistant = Text2SQLPipeline()
+            try:
 
-            response = assistant.ask(question)
+                assistant = Text2SQLPipeline()
+
+                response = assistant.ask(question)
+
+            except ConnectionError:
+
+                st.error(
+                    "❌ Ollama n'est pas disponible."
+                )
+
+                st.stop()
+
+            except Exception as error:
+
+                st.error(
+                    "❌ Impossible de traiter votre question."
+                )
+
+                st.exception(error)
+
+                st.stop()
+
+            if not response.get("success", True):
+
+                st.error(
+                    response["error"]
+                )
+
+                st.stop()
+
+            if len(response["results"]) == 0:
+
+                st.warning(
+                    "Aucun résultat trouvé."
+                )
+
+                st.stop()
 
             st.subheader("SQL généré")
 
