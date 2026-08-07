@@ -1,14 +1,32 @@
-import tempfile
+import streamlit as st
 from pathlib import Path
 
-import streamlit as st
-
-from app.pipeline import DocumentPipeline
-from app.text2sql.text2sql_pipeline import Text2SQLPipeline
+from app.ui.views.home import show_home
+from app.ui.views.dossiers import show_dossiers
+from app.ui.views.assistant import show_assistant
+from app.ui.views.settings import show_settings
 
 
 # ==========================================================
-# PAGE CONFIGURATION
+# LOAD CUSTOM CSS
+# ==========================================================
+
+def load_css():
+
+    css_path = Path(__file__).parent / "style.css"
+
+    if css_path.exists():
+
+        with open(css_path, encoding="utf-8") as f:
+
+            st.markdown(
+                f"<style>{f.read()}</style>",
+                unsafe_allow_html=True,
+            )
+
+
+# ==========================================================
+# PAGE CONFIG
 # ==========================================================
 
 st.set_page_config(
@@ -17,307 +35,76 @@ st.set_page_config(
     layout="wide",
 )
 
-st.title("🏦 Banque Populaire AI Assistant")
-
+# Load CSS
+load_css()
 
 # ==========================================================
 # SIDEBAR
 # ==========================================================
 
-page = st.sidebar.selectbox(
-    "Navigation",
-    [
-        "Analyse d'un dossier",
-        "Interroger la base",
-    ],
-)
+with st.sidebar:
 
-
-# ==========================================================
-# DOCUMENT ANALYSIS PAGE
-# ==========================================================
-
-if page == "Analyse d'un dossier":
-
-    st.header("Analyse d'un dossier PDF")
-
-    uploaded_file = st.file_uploader(
-        "Choisissez un fichier PDF",
-        type=["pdf"],
+    st.image(
+        "app/ui/assets/BCP.jfif",
+        use_container_width=True,
     )
 
-    if uploaded_file is not None:
-
-        st.success(
-            f"Fichier sélectionné : {uploaded_file.name}"
-        )
-
-        if st.button("Analyser le dossier"):
-
-            # --------------------------------------------------
-            # Save uploaded PDF temporarily
-            # --------------------------------------------------
-
-            with tempfile.NamedTemporaryFile(
-                delete=False,
-                suffix=".pdf",
-            ) as tmp_file:
-
-                tmp_file.write(
-                    uploaded_file.getbuffer()
-                )
-
-                pdf_path = Path(tmp_file.name)
-
-            # --------------------------------------------------
-            # Run pipeline safely
-            # --------------------------------------------------
-
-            try:
-
-                with st.spinner(
-                    "Analyse du dossier en cours..."
-                ):
-
-                    pipeline = DocumentPipeline(
-                        pdf_path=str(pdf_path)
-                    )
-
-                    results = pipeline.run()
-
-            except FileNotFoundError:
-
-                st.error(
-                    "❌ Impossible de trouver le fichier PDF."
-                )
-                st.stop()
-
-            except ConnectionError:
-
-                st.error(
-                    "❌ Impossible de communiquer avec Ollama."
-                )
-
-                st.info(
-                    "Vérifiez qu'Ollama est lancé puis réessayez."
-                )
-
-                st.stop()
-
-            except Exception as error:
-
-                st.error(
-                    "❌ Une erreur est survenue pendant l'analyse."
-                )
-
-                st.exception(error)
-
-                st.stop()
-
-            # --------------------------------------------------
-            # Display results
-            # --------------------------------------------------
-
-            st.success(
-                "✅ Analyse terminée avec succès."
-            )
-
-            st.subheader("Informations extraites")
-            st.json(results["fields"])
-
-            st.subheader("Validation")
-            st.json(results["validation"])
-
-            st.subheader("Valeurs normalisées")
-            st.json(results["normalized_fields"])
-
-            st.subheader("Base de données")
-
-            col1, col2 = st.columns(2)
-
-            with col1:
-
-                st.metric(
-                    "Dossier ID",
-                    results["dossier_id"],
-                )
-
-            with col2:
-
-                st.metric(
-                    "Document ID",
-                    results["document_id"],
-                )
-
-            st.divider()
-
-            # --------------------------------------------------
-            # Ask questions immediately
-            # --------------------------------------------------
-
-            st.subheader(
-                "Interroger immédiatement la base"
-            )
-
-            question = st.text_input(
-                "Posez une question sur les dossiers",
-                key="analysis_question",
-            )
-
-            if st.button(
-                "Exécuter la requête",
-                key="analysis_query",
-            ):
-
-                if question.strip() == "":
-
-                    st.warning(
-                        "Veuillez saisir une question."
-                    )
-
-                else:
-
-                    try:
-
-                        assistant = Text2SQLPipeline()
-
-                        response = assistant.ask(question)
-
-                    except ConnectionError:
-
-                        st.error(
-                            "❌ Ollama n'est pas disponible."
-                        )
-
-                        st.stop()
-
-                    except Exception as error:
-
-                        st.error(
-                            "❌ Impossible de traiter votre question."
-                        )
-
-                        st.exception(error)
-
-                        st.stop()
-
-                    if not response.get("success", True):
-
-                        st.error(
-                            response["error"]
-                        )
-
-                        st.stop()
-
-                    if len(response["results"]) == 0:
-
-                        st.warning(
-                            "Aucun résultat trouvé."
-                        )
-
-                        st.stop()
-
-                    st.subheader("SQL généré")
-
-                    st.code(
-                        response["generated_sql"],
-                        language="sql",
-                    )
-
-                    st.subheader("Résultats SQL")
-
-                    st.json(
-                        response["results"]
-                    )
-
-                    st.subheader("Réponse")
-
-                    st.success(
-                        response["answer"]
-                    )
-
-
-# ==========================================================
-# TEXT2SQL PAGE
-# ==========================================================
-
-else:
-
-    st.header("Assistant Text2SQL")
-
-    question = st.text_input(
-        "Posez votre question",
-        key="main_question",
+    st.markdown(
+        """
+        <h2 style='text-align:center;color:#E67E00;'>
+        Banque Populaire
+        </h2>
+
+        <p style='text-align:center;color:gray;'>
+        Analyse Intelligente<br>
+        des Dossiers de Crédit
+        </p>
+
+        <hr>
+        """,
+        unsafe_allow_html=True,
     )
 
-    if st.button(
-        "Poser la question",
-        key="main_query",
-    ):
+    page = st.radio(
 
-        if question.strip() == "":
+        "Navigation",
 
-            st.warning(
-                "Veuillez saisir une question."
-            )
+        [
 
-        else:
+            "🏠 Accueil",
 
-            try:
+            "📁 Dossiers",
 
-                assistant = Text2SQLPipeline()
+            "💬 Credit Assistant",
 
-                response = assistant.ask(question)
+            "⚙️ Paramètres",
 
-            except ConnectionError:
+        ],
 
-                st.error(
-                    "❌ Ollama n'est pas disponible."
-                )
+        label_visibility="collapsed",
 
-                st.stop()
+    )
 
-            except Exception as error:
+    st.markdown("<hr>", unsafe_allow_html=True)
 
-                st.error(
-                    "❌ Impossible de traiter votre question."
-                )
+    st.caption("Version 1.0")
 
-                st.exception(error)
+# ==========================================================
+# ROUTING
+# ==========================================================
 
-                st.stop()
+if page == "🏠 Accueil":
 
-            if not response.get("success", True):
+    show_home()
 
-                st.error(
-                    response["error"]
-                )
+elif page == "📁 Dossiers":
 
-                st.stop()
+    show_dossiers()
 
-            if len(response["results"]) == 0:
+elif page == "💬 Credit Assistant":
 
-                st.warning(
-                    "Aucun résultat trouvé."
-                )
+    show_assistant()
 
-                st.stop()
+elif page == "⚙️ Paramètres":
 
-            st.subheader("SQL généré")
-
-            st.code(
-                response["generated_sql"],
-                language="sql",
-            )
-
-            st.subheader("Résultats SQL")
-
-            st.json(
-                response["results"]
-            )
-
-            st.subheader("Réponse")
-
-            st.success(
-                response["answer"]
-            )
+    show_settings()

@@ -1,0 +1,38 @@
+.main {
+
+    background-color: #F7F8FA;
+
+}
+
+h1 {
+
+    color: #E67E00;
+
+}
+
+h2 {
+
+    color: #333333;
+
+}
+
+.stButton > button {
+
+    background-color: #E67E00;
+    color: white;
+    border-radius: 10px;
+    border: none;
+
+}
+
+.stButton > button:hover {
+
+    background-color: #C96A00;
+
+}
+
+.stChatInput {
+
+    border-radius: 15px;
+
+}

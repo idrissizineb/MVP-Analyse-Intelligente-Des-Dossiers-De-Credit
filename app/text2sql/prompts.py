@@ -126,6 +126,16 @@ Never generate any literal client name inside the SQL query.
 
 The application will provide the value of :client_name during SQL execution.
 
+13. If the question asks for a property (for example the type of credit, profession, city, agency, etc.) and multiple identical rows may exist, use DISTINCT to avoid duplicate results.
+
+Example:
+
+SELECT DISTINCT d.nature_credit
+FROM dossier_credit d
+JOIN client c
+ON d.client_id = c.client_id
+WHERE UPPER(c.nom_prenom)=UPPER(:client_name)
+
 ====================================================
 OUTPUT FORMAT
 ====================================================
