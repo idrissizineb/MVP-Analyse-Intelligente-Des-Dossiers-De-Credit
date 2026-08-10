@@ -46,8 +46,8 @@ class Validator:
                 fields.get("montant_credit", "")
             ),
 
-            "date_production": self._validate_date(
-                fields.get("date_production", "")
+            "date_de_decision": self._validate_date(
+                fields.get("date_de_decision", "")
             ),
 
             "date_archivage": self._validate_optional_date(

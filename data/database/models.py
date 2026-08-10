@@ -28,7 +28,7 @@ class CreditDossier:
 
     montant_credit: Optional[float] = None
 
-    date_production: Optional[str] = None
+    date_de_decision: Optional[str] = None
 
     date_archivage: Optional[str] = None
 
@@ -147,7 +147,7 @@ CREATE TABLE IF NOT EXISTS dossier_credit (
 
     montant_credit REAL NOT NULL,
 
-    date_production TEXT,
+    date_de_decision TEXT,
 
     date_archivage TEXT,
 

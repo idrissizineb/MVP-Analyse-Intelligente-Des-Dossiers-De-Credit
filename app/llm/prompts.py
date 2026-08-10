@@ -233,7 +233,7 @@ Extract the following fields:
 - numero_compte
 - nature_credit
 - montant_credit
-- date_production
+- date_de_decision
 - date_archivage
 
 ------------------------------------------------------------
@@ -270,7 +270,7 @@ EXPECTED OUTPUT
     "numero_compte": "",
     "nature_credit": "",
     "montant_credit": "",
-    "date_production": "",
+    "date_de_decision": "",
     "date_archivage": ""
 }
 

@@ -285,7 +285,7 @@ class DatabaseManager:
         numero_compte: str,
         nature_credit: str,
         montant_credit: float,
-        date_production: str | None = None,
+        date_de_decision: str | None = None,
         date_archivage: str | None = None,
         statut: str = "en_analyse",
     ) -> int:
@@ -306,7 +306,7 @@ class DatabaseManager:
 
                 montant_credit,
 
-                date_production,
+                date_de_decision,
 
                 date_archivage,
 
@@ -321,7 +321,7 @@ class DatabaseManager:
                 numero_compte,
                 nature_credit,
                 montant_credit,
-                date_production,
+                date_de_decision,
                 date_archivage,
                 statut,
             )
@@ -354,7 +354,7 @@ class DatabaseManager:
 
             montant_credit,
 
-            date_production,
+            date_de_decision,
 
             date_archivage,
 
@@ -399,7 +399,7 @@ class DatabaseManager:
 
                 montant_credit,
 
-                date_production,
+                date_de_decision,
 
                 date_archivage,
 
@@ -442,7 +442,7 @@ class DatabaseManager:
 
             montant_credit=fields["montant_credit"],
 
-            date_production=fields["date_production"],
+            date_de_decision=fields["date_de_decision"],
 
             date_archivage=fields["date_archivage"],
 

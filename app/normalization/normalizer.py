@@ -46,8 +46,8 @@ class Normalizer:
                 fields["montant_credit"]
             ),
 
-            "date_production": self._normalize_date(
-                fields["date_production"]
+            "date_de_decision": self._normalize_date(
+                fields["date_de_decision"]
             ),
 
             "date_archivage": self._normalize_date(
