@@ -173,6 +173,7 @@ class DatabaseManager:
 
     def create_client(
         self,
+        cin: str,
         nom_prenom: str
     ) -> int:
 
@@ -183,11 +184,13 @@ class DatabaseManager:
         cursor.execute(
             """
             INSERT INTO client (
+                cin,
                 nom_prenom
             )
-            VALUES (?)
+            VALUES (?,?)
             """,
             (
+                cin,
                 nom_prenom,
             )
         )
@@ -213,6 +216,7 @@ class DatabaseManager:
             """
             SELECT
                 client_id,
+                cin,
                 nom_prenom,
                 created_at
             FROM client
@@ -229,9 +233,9 @@ class DatabaseManager:
 
         return client
 
-    def get_client_by_name(
+    def get_client_by_cin(
         self,
-        nom_prenom: str
+        cin: str
     ) -> tuple | None:
 
         connection = self.database_connection.connect()
@@ -242,13 +246,14 @@ class DatabaseManager:
             """
             SELECT
                 client_id,
+                cin,
                 nom_prenom,
                 created_at
             FROM client
-            WHERE nom_prenom = ?
+            WHERE cin = ?
             """,
             (
-                nom_prenom,
+                (cin,)
             )
         )
 
@@ -260,11 +265,12 @@ class DatabaseManager:
 
     def get_or_create_client(
         self,
+        cin,
         nom_prenom: str
     ) -> int:
 
         client = self.get_client_by_name(
-            nom_prenom
+            cin
         )
 
         if client is not None:
@@ -272,6 +278,7 @@ class DatabaseManager:
             return client[0]
 
         return self.create_client(
+            cin=cin,
             nom_prenom=nom_prenom
         )
 
@@ -429,6 +436,7 @@ class DatabaseManager:
     ) -> int:
 
         client_id = self.get_or_create_client(
+            cin=fields["cin"],
             nom_prenom=fields["nom_prenom"]
         )
 

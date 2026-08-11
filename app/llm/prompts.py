@@ -229,6 +229,7 @@ FIELDS TO EXTRACT
 
 Extract the following fields:
 
+- cin
 - nom_prenom
 - numero_compte
 - nature_credit
@@ -240,12 +241,46 @@ Extract the following fields:
 RULES
 ------------------------------------------------------------
 
+## CIN RULES
+
+The CIN is the customer's identification number.
+
+It is composed of:
+
+- one or two letters
+- followed by digits
+
+Examples:
+
+A123456
+AB123456
+B1234567
+
+The CIN may appear on a different page from the customer's name.
+
+Therefore:
+
+- Search ALL pages for the CIN.
+- Do not assume that the CIN must be on the same page as the name.
+- If a value matches the CIN pattern, consider it as a candidate.
+- Do not confuse the CIN with a bank account number.
+- Do not confuse the CIN with a dossier number.
+- Do not confuse the CIN with a reference number.
+- Preserve the CIN exactly as it appears in the OCR text.
+- Do not add spaces.
+- Do not modify the letters or digits.
+- If no CIN can be identified, return an empty string.
+
+---
+
+## OTHER RULES
+
 1. Never invent information.
 
 2. Never guess missing values.
 
 3. If a field does not exist,
-return an empty string "".
+   return an empty string "".
 
 4. Preserve the extracted value exactly as written.
 
@@ -261,11 +296,12 @@ return an empty string "".
 
 10. Return ONLY valid JSON.
 
-------------------------------------------------------------
-EXPECTED OUTPUT
-------------------------------------------------------------
+---
+
+## EXPECTED OUTPUT
 
 {
+    "cin": "",
     "nom_prenom": "",
     "numero_compte": "",
     "nature_credit": "",

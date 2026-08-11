@@ -1,4 +1,6 @@
 import tempfile
+
+import sqlite3
 from pathlib import Path
 
 import streamlit as st
@@ -164,37 +166,140 @@ dans la base de données.
             st.json(results["normalized_fields"])
 
     # ==========================================================
-    # Historique
+    # Recherche par CIN
     # ==========================================================
 
     st.divider()
 
-    st.subheader("Historique des dossiers")
+    st.subheader("🔎 Rechercher un client par CIN")
 
-    repository = DossierRepository(
-        "data/database/credit_analysis.db"
+    cin = st.text_input(
+        "CIN",
+        placeholder="Exemple : AB123456",
     )
 
-    historique = repository.get_all_dossiers()
+    if st.button("🔍 Rechercher", width="stretch"):
 
-    if len(historique) == 0:
+        if not cin.strip():
 
-        st.info(
-            "Aucun dossier enregistré."
-        )
+            st.warning(
+                "Veuillez saisir une CIN."
+            )
 
-    else:
-
-        # If get_all_dossiers() returns a pandas DataFrame
-        if hasattr(historique, "iterrows"):
-
-            for _, dossier in historique.iterrows():
-
-                dossier_card(dossier)
-
-        # If it returns a list of dictionaries
         else:
 
-            for dossier in historique:
-                st.write("DEBUG:", dossier)
-                dossier_card(dossier)
+            repository = DossierRepository(
+                "data/database/credit_analysis.db"
+            )
+
+            dossiers = repository.get_dossiers_by_cin(
+                cin.strip()
+            )
+
+            if not dossiers:
+
+                st.warning(
+                    f"Aucun dossier trouvé pour la CIN : {cin}"
+                )
+
+            else:
+
+                st.success(
+                    f"{len(dossiers)} dossier(s) trouvé(s)."
+                )
+
+                for dossier in dossiers:
+
+                    dossier_card(dossier)
+
+
+    import sqlite3
+
+
+class DossierRepository:
+
+    def __init__(self, database_path: str):
+        self.database_path = database_path
+
+    # ==========================================================
+    # GET ALL DOSSIERS
+    # ==========================================================
+
+    def get_all_dossiers(self):
+
+        connection = sqlite3.connect(
+            self.database_path
+        )
+
+        connection.row_factory = sqlite3.Row
+
+        cursor = connection.cursor()
+
+        cursor.execute(
+            """
+            SELECT
+                d.dossier_id,
+                c.cin,
+                c.nom_prenom,
+                d.numero_compte,
+                d.nature_credit,
+                d.montant_credit,
+                d.date_de_decision,
+                d.statut,
+                d.created_at
+            FROM dossier_credit d
+            JOIN client c
+                ON d.client_id = c.client_id
+            ORDER BY d.created_at DESC
+            """
+        )
+
+        rows = cursor.fetchall()
+
+        connection.close()
+
+        return [dict(row) for row in rows]
+
+    # ==========================================================
+    # GET DOSSIERS BY CIN
+    # ==========================================================
+
+    def get_dossiers_by_cin(
+        self,
+        cin: str
+    ):
+
+        connection = sqlite3.connect(
+            self.database_path
+        )
+
+        connection.row_factory = sqlite3.Row
+
+        cursor = connection.cursor()
+
+        cursor.execute(
+            """
+            SELECT
+                d.dossier_id,
+                c.cin,
+                c.nom_prenom,
+                d.numero_compte,
+                d.nature_credit,
+                d.montant_credit,
+                d.date_de_decision,
+                d.statut,
+                d.created_at
+            FROM dossier_credit d
+            JOIN client c
+                ON d.client_id = c.client_id
+            WHERE c.cin = ?
+            ORDER BY d.created_at DESC
+            """,
+            (cin,)
+        )
+
+        rows = cursor.fetchall()
+
+        connection.close()
+
+        return [dict(row) for row in rows]

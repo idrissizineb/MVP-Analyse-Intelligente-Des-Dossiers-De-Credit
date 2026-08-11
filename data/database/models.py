@@ -12,6 +12,8 @@ class Client:
 
     id: Optional[int] = None
 
+    cin: Optional[str] = None
+
     nom_prenom: Optional[str] = None
 
 
@@ -123,6 +125,8 @@ CREATE_CLIENT_TABLE = """
 CREATE TABLE IF NOT EXISTS client (
 
     client_id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+    cin TEXT UNIQUE NOT NULL,
 
     nom_prenom TEXT NOT NULL,
 
