@@ -35,7 +35,7 @@ from app.postprocessing.text_reconstructor import TextReconstructor
 # LLM
 # ==========================================================
 
-from app.llm.ollama_client import OllamaClient
+from app.llm.groq_client import GroqClient
 from app.llm.field_extractor import FieldExtractor
 
 
@@ -161,7 +161,7 @@ class DocumentPipeline:
         # LLM
         # ======================================================
 
-        self.llm = OllamaClient()
+        self.llm = GroqClient()
 
         self.extractor = FieldExtractor(
             self.llm

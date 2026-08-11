@@ -1,6 +1,6 @@
 import json
 
-from app.llm.ollama_client import OllamaClient
+from app.llm.groq_client import GroqClient
 
 from app.text2sql.prompts import ANSWER_GENERATION_PROMPT
 
@@ -12,7 +12,7 @@ class AnswerGenerator:
 
     def __init__(self):
 
-        self.llm = OllamaClient()
+        self.llm = GroqClient()
 
     def generate(
         self,

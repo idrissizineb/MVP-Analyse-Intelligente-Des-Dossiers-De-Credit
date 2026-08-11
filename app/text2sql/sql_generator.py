@@ -1,5 +1,4 @@
-from app.llm.ollama_client import OllamaClient
-
+from app.llm.groq_client import GroqClient
 from app.text2sql.prompts import TEXT_TO_SQL_PROMPT
 
 from app.text2sql.schema_manager import SchemaManager
@@ -15,7 +14,7 @@ class SQLGenerator:
         database_path: str,
     ):
 
-        self.llm = OllamaClient()
+        self.llm = GroqClient()
 
         self.schema_manager = SchemaManager(
             database_path
