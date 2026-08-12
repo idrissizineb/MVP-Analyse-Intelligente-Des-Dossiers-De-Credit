@@ -30,30 +30,83 @@ class Normalizer:
         """
 
         return {
+            # ==================================================
+            # CIN
+            # ==================================================
+
+            "cin": self._normalize_cin(
+                fields["cin"]
+            ),
+
+            # ==================================================
+            # Name
+            # ==================================================
+
             "nom_prenom": self._normalize_name(
                 fields["nom_prenom"]
             ),
+
+            # ==================================================
+            # Account number
+            # ==================================================
 
             "numero_compte": self._normalize_account(
                 fields["numero_compte"]
             ),
 
+            # ==================================================
+            # Credit type
+            # ==================================================
+
             "nature_credit": self._normalize_credit_type(
                 fields["nature_credit"]
             ),
+
+            # ==================================================
+            # Amount
+            # ==================================================
 
             "montant_credit": self._normalize_amount(
                 fields["montant_credit"]
             ),
 
+            # ==================================================
+            # Decision date
+            # ==================================================
+
             "date_de_decision": self._normalize_date(
                 fields["date_de_decision"]
             ),
+
+            # ==================================================
+            # Archive date
+            # ==================================================
 
             "date_archivage": self._normalize_date(
                 fields["date_archivage"]
             ),
         }
+
+    # ==========================================================
+    # CIN
+    # ==========================================================
+
+    def _normalize_cin(
+        self,
+        value: str
+    ) -> str:
+
+        """
+        Normalize the CIN.
+
+        The CIN is converted to uppercase and
+        surrounding spaces are removed.
+
+        Example:
+            ab123456 -> AB123456
+        """
+
+        return str(value).strip().upper()
 
     # ==========================================================
     # Name

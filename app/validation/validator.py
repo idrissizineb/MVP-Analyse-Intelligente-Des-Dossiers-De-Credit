@@ -30,25 +30,57 @@ class Validator:
         """
 
         results = {
+            # ==================================================
+            # CIN
+            # ==================================================
+
+            "cin": self._validate_cin(
+                fields.get("cin", "")
+            ),
+
+            # ==================================================
+            # Client name
+            # ==================================================
+
             "nom_prenom": self._validate_name(
                 fields.get("nom_prenom", "")
             ),
+
+            # ==================================================
+            # Account number
+            # ==================================================
 
             "numero_compte": self._validate_account(
                 fields.get("numero_compte", "")
             ),
 
+            # ==================================================
+            # Credit type
+            # ==================================================
+
             "nature_credit": self._validate_credit_type(
                 fields.get("nature_credit", "")
             ),
+
+            # ==================================================
+            # Credit amount
+            # ==================================================
 
             "montant_credit": self._validate_amount(
                 fields.get("montant_credit", "")
             ),
 
+            # ==================================================
+            # Decision date
+            # ==================================================
+
             "date_de_decision": self._validate_date(
                 fields.get("date_de_decision", "")
             ),
+
+            # ==================================================
+            # Archive date
+            # ==================================================
 
             "date_archivage": self._validate_optional_date(
                 fields.get("date_archivage", "")
@@ -63,6 +95,58 @@ class Validator:
         return {
             "fields": results,
             "is_valid": is_valid,
+        }
+
+    # ==========================================================
+    # CIN validation
+    # ==========================================================
+
+    def _validate_cin(self, value: str) -> dict:
+        """
+        Validate the customer's CIN.
+
+        Expected format:
+        - One or two letters
+        - Followed by digits
+
+        Examples:
+        - A123456
+        - AB123456
+
+        The validation is case-insensitive.
+        """
+
+        value = str(value).strip()
+
+        if not value:
+            return {
+                "value": value,
+                "status": "invalid",
+                "error": "CIN is missing."
+            }
+
+        # Normalize letters to uppercase.
+        normalized_value = value.upper()
+
+        # Expected format:
+        # 1 or 2 letters + one or more digits
+        if not re.fullmatch(
+            r"[A-Z]{1,2}\d+",
+            normalized_value
+        ):
+            return {
+                "value": value,
+                "status": "invalid",
+                "error": (
+                    "Invalid CIN format. "
+                    "Expected one or two letters followed by digits."
+                )
+            }
+
+        return {
+            "value": normalized_value,
+            "status": "valid",
+            "error": None
         }
 
     # ==========================================================
@@ -95,7 +179,10 @@ class Validator:
                 "error": "Customer name must not contain digits."
             }
 
-        if not re.search(r"[A-Za-zÀ-ÿ]", value):
+        if not re.search(
+            r"[A-Za-zÀ-ÿ]",
+            value
+        ):
             return {
                 "value": value,
                 "status": "invalid",
@@ -134,14 +221,19 @@ class Validator:
             return {
                 "value": value,
                 "status": "invalid",
-                "error": "Account number must contain digits only."
+                "error": (
+                    "Account number must contain digits only."
+                )
             }
 
         if len(value) != 16:
             return {
                 "value": value,
                 "status": "invalid",
-                "error": "Account number must contain exactly 16 digits."
+                "error": (
+                    "Account number must contain exactly "
+                    "16 digits."
+                )
             }
 
         return {
@@ -175,11 +267,16 @@ class Validator:
                 "error": "Credit type is missing."
             }
 
-        if not re.search(r"[A-Za-zÀ-ÿ]", value):
+        if not re.search(
+            r"[A-Za-zÀ-ÿ]",
+            value
+        ):
             return {
                 "value": value,
                 "status": "invalid",
-                "error": "Credit type must contain letters."
+                "error": (
+                    "Credit type must contain letters."
+                )
             }
 
         return {
@@ -221,7 +318,10 @@ class Validator:
         ).strip()
 
         # Remove spaces used as thousands separators.
-        cleaned_value = cleaned_value.replace(" ", "")
+        cleaned_value = cleaned_value.replace(
+            " ",
+            ""
+        )
 
         # Accept:
         # 740000
@@ -241,7 +341,10 @@ class Validator:
 
         try:
             numeric_value = float(
-                cleaned_value.replace(",", ".")
+                cleaned_value.replace(
+                    ",",
+                    "."
+                )
             )
 
         except ValueError:
@@ -255,7 +358,9 @@ class Validator:
             return {
                 "value": value,
                 "status": "invalid",
-                "error": "Credit amount must be greater than zero."
+                "error": (
+                    "Credit amount must be greater than zero."
+                )
             }
 
         return {
@@ -323,7 +428,10 @@ class Validator:
     # Optional date validation
     # ==========================================================
 
-    def _validate_optional_date(self, value: str) -> dict:
+    def _validate_optional_date(
+        self,
+        value: str
+    ) -> dict:
         """
         Validate an optional date.
 

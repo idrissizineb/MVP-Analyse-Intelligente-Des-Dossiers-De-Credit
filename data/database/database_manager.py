@@ -265,11 +265,11 @@ class DatabaseManager:
 
     def get_or_create_client(
         self,
-        cin,
+        cin:str,
         nom_prenom: str
     ) -> int:
 
-        client = self.get_client_by_name(
+        client = self.get_client_by_cin(
             cin
         )
 
