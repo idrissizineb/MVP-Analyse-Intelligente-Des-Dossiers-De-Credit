@@ -37,6 +37,14 @@ from app.postprocessing.text_reconstructor import TextReconstructor
 
 from app.llm.groq_client import GroqClient
 from app.llm.field_extractor import FieldExtractor
+from app.llm.prompts import OCR_CORRECTION_PROMPT
+
+
+# ==========================================================
+# SECURITY
+# ==========================================================
+
+from app.security.pseudonymizer import Pseudonymizer
 
 
 # ==========================================================
@@ -60,30 +68,28 @@ class DocumentPipeline:
     End-to-end Intelligent Document Processing pipeline
     for banking documents.
 
+    Sensitive information is pseudonymized locally before
+    any text is sent to Groq.
+
     Pipeline:
 
-        1. Validate the input document
+        1. Validate document
         2. Convert PDF into page images
-        3. Convert images to grayscale
-        4. Correct document skew
-        5. Remove image noise
-        6. Enhance image contrast
-        7. Resize images for OCR
-        8. Perform OCR using PaddleOCR
-        9. Filter low-confidence OCR detections
-        10. Sort OCR results according to reading order
-        11. Reconstruct OCR detections into readable text
-        12. Correct OCR errors using the LLM
-        13. Extract structured banking fields
-        14. Validate extracted fields
-        15. Normalize extracted fields
-        16. Save credit dossier in database
-        17. Save document in database
-        18. Save document pages in database
-        19. Save OCR results in database
-        20. Save extracted fields in database
-        21. Save validation results in database
-        22. Return processing results
+        3. Preprocess images
+        4. Perform OCR
+        5. Reconstruct OCR text
+        6. Pseudonymize sensitive information locally
+        7. Send pseudonymized text to Groq for OCR correction
+        8. Send pseudonymized complete document to Groq for field extraction
+        9. Restore original sensitive values locally
+        10. Validate fields
+        11. Normalize fields
+        12. Save credit dossier
+        13. Save document
+        14. Save pages and OCR results
+        15. Save extracted fields
+        16. Save validation results
+        17. Return results
     """
 
     def __init__(
@@ -168,6 +174,42 @@ class DocumentPipeline:
         )
 
         # ======================================================
+        # SECURITY / PSEUDONYMIZATION
+        # ======================================================
+
+        # One pseudonymizer is used for the entire PDF.
+        #
+        # This allows the same sensitive value appearing
+        # on different pages to keep the same pseudonym.
+        #
+        # Example:
+        #
+        # IDRISSI ZINEB
+        #     -> [PERSON_001]
+        #
+        # CIN_001
+        #     -> [CIN_001]
+        #
+        # 1234567891234567
+        #     -> [ACCOUNT_001]
+
+        self.pseudonymizer = Pseudonymizer()
+
+        # Mapping remains LOCAL.
+        #
+        # It is NEVER sent to Groq.
+        #
+        # Example:
+        #
+        # {
+        #     "[PERSON_001]": "IDRISSI ZINEB",
+        #     "[CIN_001]": "CIN_001",
+        #     "[ACCOUNT_001]": "1234567891234567"
+        # }
+
+        self.pseudonymizer_mapping = {}
+
+        # ======================================================
         # VALIDATION
         # ======================================================
 
@@ -207,7 +249,6 @@ class DocumentPipeline:
         )
 
         if not success:
-
             raise IOError(
                 f"Failed to save image: {image_path}"
             )
@@ -246,6 +287,46 @@ class DocumentPipeline:
         return str(json_path)
 
     # ==========================================================
+    # RESTORE EXTRACTED FIELDS
+    # ==========================================================
+
+    def _restore_extracted_fields(
+        self,
+        fields: dict
+    ) -> dict:
+
+        """
+        Restore pseudonymized sensitive values locally.
+
+        This method is executed AFTER Groq field extraction.
+
+        Groq returns values such as:
+
+            [PERSON_001]
+            [CIN_001]
+            [ACCOUNT_001]
+
+        The original values are restored locally using the
+        private pseudonymization mapping.
+        """
+
+        restored_fields = {}
+
+        for field_name, value in fields.items():
+
+            if value is None:
+
+                restored_fields[field_name] = value
+
+                continue
+
+            value = str(value)
+
+            restored_fields[field_name] = ( self.pseudonymizer.restore(value) )
+
+        return restored_fields
+
+    # ==========================================================
     # PROCESS SINGLE PAGE
     # ==========================================================
 
@@ -257,6 +338,17 @@ class DocumentPipeline:
 
         """
         Process a single PDF page.
+
+        Important security rule:
+
+            reconstructed_text
+                ↓
+            pseudonymization
+                ↓
+            Groq
+
+        Therefore original sensitive information never
+        reaches Groq.
         """
 
         print(
@@ -299,20 +391,26 @@ class DocumentPipeline:
         # OCR POSTPROCESSING
         # ======================================================
 
-        filtered_ocr_results = self.postprocessor.filter_confidence(
-            ocr_results
+        filtered_ocr_results = (
+            self.postprocessor.filter_confidence(
+                ocr_results
+            )
         )
 
-        sorted_ocr_results = self.postprocessor.sort_reading_order(
-            filtered_ocr_results
+        sorted_ocr_results = (
+            self.postprocessor.sort_reading_order(
+                filtered_ocr_results
+            )
         )
 
         # ======================================================
         # TEXT RECONSTRUCTION
         # ======================================================
 
-        reconstructed_lines = self.reconstructor.reconstruct(
-            sorted_ocr_results
+        reconstructed_lines = (
+            self.reconstructor.reconstruct(
+                sorted_ocr_results
+            )
         )
 
         reconstructed_text = "\n".join(
@@ -333,13 +431,46 @@ class DocumentPipeline:
             )
 
         # ======================================================
-        # OCR CORRECTION USING LLM
+        # PSEUDONYMIZATION
+        # ======================================================
+
+        print(
+            "\n===== PSEUDONYMIZATION ====="
+        )
+
+        pseudonymized_text, mapping = (
+            self.pseudonymizer.pseudonymize(
+                reconstructed_text
+            )
+        )
+
+        # Keep mapping locally for the entire PDF.
+
+        self.pseudonymizer_mapping.update(
+            mapping
+        )
+
+        print(
+            "✓ Sensitive information pseudonymized."
+        )
+
+        print(
+            "\n===== TEXT SENT TO GROQ ====="
+        )
+
+        print(
+            pseudonymized_text
+        )
+
+        # ======================================================
+        # OCR CORRECTION USING GROQ
         # ======================================================
 
         try:
 
             corrected_text = self.llm.correct_ocr(
-                reconstructed_text
+                prompt=OCR_CORRECTION_PROMPT,
+                document=pseudonymized_text
             )
 
         except Exception as error:
@@ -349,10 +480,18 @@ class DocumentPipeline:
             )
 
             print(
-                "Using reconstructed OCR text instead."
+                "Using pseudonymized OCR text instead."
             )
 
-            corrected_text = reconstructed_text
+            corrected_text = pseudonymized_text
+
+        # IMPORTANT:
+        #
+        # DO NOT restore the original values here.
+        #
+        # corrected_text remains pseudonymized because
+        # it will later be sent to Groq again during
+        # field extraction.
 
         # ======================================================
         # SAVE INTERMEDIATE RESULTS
@@ -443,19 +582,16 @@ class DocumentPipeline:
         # ======================================================
 
         return {
-
             "page_number": page_number,
-
             "resized_path": resized_path,
-
             "ocr": sorted_ocr_results,
-
             "lines": reconstructed_lines,
 
+            # Original OCR text remains local.
             "reconstructed_text": reconstructed_text,
 
+            # Corrected text remains pseudonymized.
             "corrected_text": corrected_text,
-
         }
 
     # ==========================================================
@@ -519,23 +655,38 @@ class DocumentPipeline:
         # ======================================================
 
         corrected_pages = [
-
             page["corrected_text"]
-
             for page in processed_pages
-
         ]
 
         # ======================================================
-        # STEP 5 - EXTRACT FIELDS
+        # STEP 5 - FIELD EXTRACTION USING GROQ
         # ======================================================
+
+        print(
+            "\n========== FIELD EXTRACTION USING GROQ ==========\n"
+        )
+
+        # corrected_pages are STILL pseudonymized.
+        #
+        # Groq therefore sees:
+        #
+        # [PERSON_001]
+        # [CIN_001]
+        # [ACCOUNT_001]
+        #
+        # and NOT:
+        #
+        # IDRISSI ZINEB
+        # CIN_001
+        # 1234567891234567
 
         extracted_fields = self.extractor.extract(
             corrected_pages
         )
 
         print(
-            "\n========== EXTRACTED FIELDS ==========\n"
+            "\n========== EXTRACTED PSEUDONYMIZED FIELDS ==========\n"
         )
 
         print(
@@ -547,7 +698,29 @@ class DocumentPipeline:
         )
 
         # ======================================================
-        # STEP 6 - VALIDATE FIELDS
+        # STEP 6 - RESTORE ORIGINAL VALUES LOCALLY
+        # ======================================================
+
+        print(
+            "\n========== RESTORING FIELDS LOCALLY ==========\n"
+        )
+
+        extracted_fields = (
+            self._restore_extracted_fields(
+                extracted_fields
+            )
+        )
+
+        print(
+            json.dumps(
+                extracted_fields,
+                indent=4,
+                ensure_ascii=False
+            )
+        )
+
+        # ======================================================
+        # STEP 7 - VALIDATE FIELDS
         # ======================================================
 
         validation_result = self.validator.validate(
@@ -567,7 +740,7 @@ class DocumentPipeline:
         )
 
         # ======================================================
-        # STEP 7 - NORMALIZE FIELDS
+        # STEP 8 - NORMALIZE FIELDS
         # ======================================================
 
         normalized_fields = self.normalizer.normalize(
@@ -588,11 +761,13 @@ class DocumentPipeline:
         )
 
         # ======================================================
-        # STEP 8 - SAVE CREDIT DOSSIER
+        # STEP 9 - SAVE CREDIT DOSSIER
         # ======================================================
 
-        dossier_id = self.database_manager.save_credit_dossier(
-            normalized_fields
+        dossier_id = (
+            self.database_manager.save_credit_dossier(
+                normalized_fields
+            )
         )
 
         print(
@@ -608,21 +783,17 @@ class DocumentPipeline:
         )
 
         # ======================================================
-        # STEP 9 - CREATE DOCUMENT
+        # STEP 10 - CREATE DOCUMENT
         # ======================================================
 
-        document_id = self.database_manager.create_document(
-
-            dossier_id=dossier_id,
-
-            nom_fichier=self.pdf_path.name,
-
-            type_document=None,
-
-            nombre_pages=len(processed_pages),
-
-            chemin_fichier=str(self.pdf_path)
-
+        document_id = (
+            self.database_manager.create_document(
+                dossier_id=dossier_id,
+                nom_fichier=self.pdf_path.name,
+                type_document=None,
+                nombre_pages=len(processed_pages),
+                chemin_fichier=str(self.pdf_path)
+            )
         )
 
         print(
@@ -630,7 +801,7 @@ class DocumentPipeline:
         )
 
         # ======================================================
-        # STEP 10 - SAVE DOCUMENT PAGES AND OCR RESULTS
+        # STEP 11 - SAVE DOCUMENT PAGES AND OCR RESULTS
         # ======================================================
 
         page_ids = []
@@ -661,14 +832,12 @@ class DocumentPipeline:
             # SAVE DOCUMENT PAGE
             # --------------------------------------------------
 
-            page_id = self.database_manager.create_document_page(
-
-                document_id=document_id,
-
-                numero_page=page_number,
-
-                chemin_image=resized_path
-
+            page_id = (
+                self.database_manager.create_document_page(
+                    document_id=document_id,
+                    numero_page=page_number,
+                    chemin_image=resized_path
+                )
             )
 
             page_ids.append(
@@ -688,27 +857,19 @@ class DocumentPipeline:
             # --------------------------------------------------
 
             raw_ocr_json = json.dumps(
-
                 page["ocr"],
-
                 ensure_ascii=False
-
             )
 
-            ocr_result_id = self.database_manager.save_ocr_result(
-
-                page_id=page_id,
-
-                raw_text=page["reconstructed_text"],
-
-                corrected_text=page["corrected_text"],
-
-                raw_ocr_json=raw_ocr_json,
-
-                average_confidence=None,
-
-                ocr_engine="PaddleOCR"
-
+            ocr_result_id = (
+                self.database_manager.save_ocr_result(
+                    page_id=page_id,
+                    raw_text=page["reconstructed_text"],
+                    corrected_text=page["corrected_text"],
+                    raw_ocr_json=raw_ocr_json,
+                    average_confidence=None,
+                    ocr_engine="PaddleOCR"
+                )
             )
 
             print(
@@ -720,21 +881,19 @@ class DocumentPipeline:
             )
 
         # ======================================================
-        # STEP 11 - SAVE EXTRACTED FIELDS
+        # STEP 12 - SAVE EXTRACTED FIELDS
         # ======================================================
 
         print(
             "\n========== SAVING EXTRACTED FIELDS =========="
         )
 
-        extracted_field_ids = self.database_manager.save_extracted_fields(
-
-            document_id=document_id,
-
-            fields=extracted_fields,
-
-            normalized_fields=normalized_fields
-
+        extracted_field_ids = (
+            self.database_manager.save_extracted_fields(
+                document_id=document_id,
+                fields=extracted_fields,
+                normalized_fields=normalized_fields
+            )
         )
 
         print(
@@ -746,19 +905,18 @@ class DocumentPipeline:
         )
 
         # ======================================================
-        # STEP 12 - SAVE VALIDATION RESULTS
+        # STEP 13 - SAVE VALIDATION RESULTS
         # ======================================================
 
         print(
             "\n========== SAVING VALIDATION RESULTS =========="
         )
 
-        validation_ids = self.database_manager.save_validation_results(
-
-            document_id=document_id,
-
-            validation_result=validation_result
-
+        validation_ids = (
+            self.database_manager.save_validation_results(
+                document_id=document_id,
+                validation_result=validation_result
+            )
         )
 
         print(
@@ -778,9 +936,9 @@ class DocumentPipeline:
         )
 
         return {
-
             "pages": processed_pages,
 
+            # These fields have been restored locally.
             "fields": extracted_fields,
 
             "validation": validation_result,
@@ -796,5 +954,4 @@ class DocumentPipeline:
             "extracted_field_ids": extracted_field_ids,
 
             "validation_ids": validation_ids
-
         }

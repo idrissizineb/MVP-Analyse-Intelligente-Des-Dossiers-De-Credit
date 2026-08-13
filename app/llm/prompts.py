@@ -245,7 +245,9 @@ RULES
 
 The CIN is the customer's identification number.
 
-It is composed of:
+### ORIGINAL CIN FORMAT
+
+In the original document, a Moroccan CIN is generally composed of:
 
 - one or two letters
 - followed by digits
@@ -254,22 +256,83 @@ Examples:
 
 A123456
 AB123456
-B1234567
+CIN_001
+
+### IMPORTANT: PSEUDONYMIZED CIN
+
+For security, sensitive information has been pseudonymized BEFORE
+sending the OCR text to you.
+
+Therefore, the real CIN may NOT appear in the OCR text.
+
+Instead, a real CIN can appear as a pseudonym such as:
+
+[CIN_001]
+[CIN_002]
+[CIN_003]
+
+These placeholders represent real CIN values that were replaced locally.
+
+### CIN EXTRACTION PRIORITY
+
+When a pseudonymized CIN placeholder exists:
+
+- ALWAYS use the `[CIN_XXX]` placeholder as the CIN.
+- NEVER replace a `[CIN_XXX]` placeholder with another value.
+- NEVER try to reconstruct the original CIN.
+- NEVER infer the original CIN from surrounding text.
+- The placeholder `[CIN_XXX]` is a valid CIN representation for this extraction step.
+
+For example, if the OCR contains:
+
+[CIN_001]
+
+return:
+
+"cin": "[CIN_001]"
+
+### IMPORTANT
+
+Do NOT consider a standalone sequence of only one or two letters to be a CIN.
+
+For example:
+
+FL
+AB
+FR
+MA
+
+must NOT be considered a CIN unless it is followed by digits
+or explicitly identified as a CIN by surrounding context.
+
+A value such as:
+
+FL
+
+is NOT a valid CIN.
+
+### SEARCH ALL PAGES
 
 The CIN may appear on a different page from the customer's name.
 
 Therefore:
 
-- Search ALL pages for the CIN.
-- Do not assume that the CIN must be on the same page as the name.
-- If a value matches the CIN pattern, consider it as a candidate.
-- Do not confuse the CIN with a bank account number.
-- Do not confuse the CIN with a dossier number.
-- Do not confuse the CIN with a reference number.
-- Preserve the CIN exactly as it appears in the OCR text.
-- Do not add spaces.
-- Do not modify the letters or digits.
+- Search ALL pages.
+- First look for `[CIN_XXX]` placeholders.
+- If a `[CIN_XXX]` placeholder exists, use it.
+- Otherwise look for an original CIN matching the letter(s) + digits pattern.
 - If no CIN can be identified, return an empty string.
+
+### DO NOT CONFUSE
+
+Do not confuse the CIN with:
+
+- a bank account number
+- a dossier number
+- a reference number
+- an agency code
+- an OCR fragment
+- a standalone sequence of letters
 
 ---
 
