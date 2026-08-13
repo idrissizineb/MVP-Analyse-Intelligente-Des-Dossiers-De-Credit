@@ -103,6 +103,12 @@ Je peux répondre à vos questions concernant :
 
                 except Exception as e:
 
+                    import traceback
+
+                    print("\n========== TEXT2SQL ERROR ==========")
+                    print(e)
+                    traceback.print_exc()
+
                     assistant_answer = (
                         "❌ Une erreur est survenue.\n\n"
                         f"```{e}```"
