@@ -121,7 +121,6 @@ class Pseudonymizer:
             one or two letters followed by digits.
 
         Examples:
-            CIN_001
             AB123456
         """
 

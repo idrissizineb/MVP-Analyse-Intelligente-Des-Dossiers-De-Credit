@@ -187,7 +187,7 @@ class DocumentPipeline:
         # IDRISSI ZINEB
         #     -> [PERSON_001]
         #
-        # CIN_001
+        # AS123456
         #     -> [CIN_001]
         #
         # 1234567891234567
@@ -203,7 +203,7 @@ class DocumentPipeline:
         #
         # {
         #     "[PERSON_001]": "IDRISSI ZINEB",
-        #     "[CIN_001]": "CIN_001",
+        #     "[CIN_001]": "AS123456",
         #     "[ACCOUNT_001]": "1234567891234567"
         # }
 
@@ -678,7 +678,7 @@ class DocumentPipeline:
         # and NOT:
         #
         # IDRISSI ZINEB
-        # CIN_001
+        # AS123456
         # 1234567891234567
 
         extracted_fields = self.extractor.extract(

@@ -17,7 +17,7 @@ class EntityExtractor:
         - followed by digits
 
         Examples:
-        CIN_001
+        AS123456
         AB123456
         """
 
@@ -31,7 +31,7 @@ class EntityExtractor:
         # Search for a CIN anywhere in the question.
         #
         # Examples:
-        # CIN_001
+        # AS123456
         # AB123456
         #
         cin_pattern = r"\b[A-Za-z]{1,2}\d{5,8}\b"

@@ -3,7 +3,7 @@ from app.security.pseudonymizer import Pseudonymizer
 
 text = """
 Nom et prénom : IDRISSI ZINEB
-CIN : CIN_001
+CIN : ac185326
 N° compte : 1234567891234567
 Montant : 740 000,00 DHs
 """

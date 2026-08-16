@@ -71,7 +71,7 @@ A CIN normally consists of:
 
 Examples:
 
-CIN_001
+AS123456
 AB123456
 B1234567
 
@@ -88,7 +88,7 @@ c.cin
 Example:
 
 User:
-Quel est le type de crédit du client CIN_001 ?
+Quel est le type de crédit du client AS123456 ?
 
 Generate:
 
@@ -108,11 +108,11 @@ WHERE UPPER(c.cin) = UPPER(:cin)
 
 Incorrect:
 
-WHERE c.cin = 'CIN_001'
+WHERE c.cin = 'AS123456'
 
 Incorrect:
 
-WHERE UPPER(c.cin) = UPPER('CIN_001')
+WHERE UPPER(c.cin) = UPPER('AS123456')
 
 The application will provide the value of :cin during SQL execution.
 
@@ -210,7 +210,7 @@ identifying the client.
 Example:
 
 User:
-Quel est le crédit de IDRISSI ZINEB, CIN CIN_001 ?
+Quel est le crédit de IDRISSI ZINEB, CIN SD123456 ?
 
 Use:
 
@@ -261,7 +261,7 @@ The application provides the values of the named parameters.
 Possible parameters include:
 
 {{
-    "cin": "CIN_001"
+    "cin": "AS123456"
 }}
 
 or:
@@ -281,7 +281,7 @@ EXAMPLES
 Example 1:
 
 User:
-Quel est le type de crédit du client CIN_001 ?
+Quel est le type de crédit du client AS123456 ?
 
 SQL:
 
@@ -295,7 +295,7 @@ WHERE UPPER(c.cin) = UPPER(:cin)
 Example 2:
 
 User:
-Quel est le montant du crédit de CIN_001 ?
+Quel est le montant du crédit de AS123456 ?
 
 SQL:
 
@@ -323,7 +323,7 @@ WHERE UPPER(c.nom_prenom) = UPPER(:client_name)
 Example 4:
 
 User:
-Quels sont les crédits de CIN_001 ?
+Quels sont les crédits de AS123456 ?
 
 SQL:
 
