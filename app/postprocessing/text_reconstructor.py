@@ -116,13 +116,4 @@ class TextReconstructor:
 
             reconstructed_lines.append(line_text)
 
-        # ==========================================================
-        # Debug
-        # ==========================================================
-
-        print("\n===== Reconstructed Document =====")
-
-        for i, line in enumerate(reconstructed_lines, start=1):
-            print(f"{i:02d}. {line}")
-
         return reconstructed_lines

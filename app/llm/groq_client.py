@@ -9,11 +9,18 @@ load_dotenv()
 class GroqClient:
     """
     Client used to communicate with Groq API.
+
+    GPT-OSS 120B is used for:
+    - OCR correction
+    - Structured field extraction
+
+    Field extraction uses Groq Structured Outputs with
+    strict JSON Schema to guarantee valid JSON.
     """
 
     def __init__(
         self,
-        model: str = "llama-3.3-70b-versatile",
+        model: str = "openai/gpt-oss-120b",
     ):
 
         api_key = os.getenv("GROQ_API_KEY")
@@ -55,6 +62,10 @@ class GroqClient:
             ],
 
             temperature=temperature,
+
+            # GPT-OSS reasoning
+            reasoning_effort="low",
+            reasoning_format="hidden",
         )
 
         return response.choices[0].message.content or ""
@@ -85,8 +96,102 @@ class GroqClient:
         document: str,
     ) -> str:
 
-        return self.chat(
-            prompt=document,
-            system_prompt=prompt,
+        print("\n========== GROQ FIELD EXTRACTION DEBUG ==========")
+        print(f"MODEL: {self.model}")
+        print("STRUCTURED OUTPUT: ENABLED")
+        print("STRICT JSON SCHEMA: ENABLED")
+        print("REASONING: LOW")
+        print("=================================================\n")
+
+        response = self.client.chat.completions.create(
+
+            model=self.model,
+
+            messages=[
+                {
+                    "role": "system",
+                    "content": prompt,
+                },
+                {
+                    "role": "user",
+                    "content": document,
+                },
+            ],
+
+            # ==================================================
+            # STRICT STRUCTURED OUTPUT
+            # ==================================================
+
+            response_format={
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "credit_file_fields",
+
+                    "strict": True,
+
+                    "schema": {
+                        "type": "object",
+
+                        "properties": {
+
+                            "cin": {
+                                "type": "string"
+                            },
+
+                            "nom_prenom": {
+                                "type": "string"
+                            },
+
+                            "numero_compte": {
+                                "type": "string"
+                            },
+
+                            "nature_credit": {
+                                "type": "string"
+                            },
+
+                            "montant_credit": {
+                                "type": "string"
+                            },
+
+                            "date_de_decision": {
+                                "type": "string"
+                            },
+
+                            "date_archivage": {
+                                "type": "string"
+                            },
+                        },
+
+                        "required": [
+                            "cin",
+                            "nom_prenom",
+                            "numero_compte",
+                            "nature_credit",
+                            "montant_credit",
+                            "date_de_decision",
+                            "date_archivage",
+                        ],
+
+                        "additionalProperties": False,
+                    },
+                },
+            },
+
+            # GPT-OSS supports low / medium / high reasoning.
+            # Low is enough for this extraction task.
+            reasoning_effort="low",
+
+            # Hide reasoning tokens from the returned content.
+            reasoning_format="hidden",
+
             temperature=0,
         )
+
+        content = response.choices[0].message.content or ""
+
+        print("========== GROQ RESPONSE ==========")
+        print(content)
+        print("===================================\n")
+
+        return content
