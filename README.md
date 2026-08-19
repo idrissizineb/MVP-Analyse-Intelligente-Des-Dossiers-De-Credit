@@ -1,259 +1,274 @@
-# 📖 Overview
+# Analyse Intelligente des Dossiers de Crédit
 
-Intelligent Credit File Analysis System is an AI-powered Intelligent Document Processing (IDP) platform developed to automate the analysis of banking credit files.
+AI-powered Intelligent Document Processing (IDP) platform that automates the analysis of banking credit files. The system transforms scanned PDF documents into structured, validated data stored in a SQLite database, with a Streamlit interface for upload, search, and natural-language querying.
 
-The system transforms scanned banking documents into structured digital information through an end-to-end pipeline combining computer vision, Optical Character Recognition (OCR), Large Language Models (LLMs), data validation, normalization, and database integration.
+Developed during an AI Engineering internship at **Banque Populaire Maroc**.
 
-Current capabilities include:
+---
 
-- PDF preprocessing
-- OCR using PaddleOCR
-- OCR correction using Groq LLM
-- Automatic extraction of key banking fields
-- Field validation
-- Data normalization
-- Automatic storage in a relational SQLite database
+## Features
 
-The project is being developed during an AI Engineering internship at Banque Populaire Morocco and will later evolve into a Retrieval-Augmented Generation (RAG) assistant for intelligent document querying.
+- **End-to-end PDF pipeline** — validation, image preprocessing, OCR, LLM correction, field extraction, validation, normalization, and database storage
+- **Image preprocessing** — grayscale, deskew, denoising, contrast enhancement, and resize to improve OCR accuracy
+- **OCR with PaddleOCR** — text detection, recognition, confidence filtering, and reading-order reconstruction
+- **LLM-powered extraction** — Groq API for OCR correction and structured field extraction (JSON Schema)
+- **Data privacy** — local pseudonymization of sensitive data (CIN, names, account numbers) before any text is sent to external LLMs
+- **Field validation & normalization** — business rules for Moroccan banking documents
+- **SQLite persistence** — clients, credit dossiers, documents, pages, OCR results, extracted fields, and validation results
+- **Streamlit web UI** — upload PDFs, browse dossiers, and query the database in natural language
+- **Text-to-SQL assistant** — ask questions about credit files; the system generates, validates, and executes SQL safely
 
-# 🎯 Objectives
+---
 
-The project aims to:
+## Architecture
 
-- Automate the processing of banking credit documents.
-- Improve OCR accuracy using image preprocessing.
-- Correct OCR errors using a Large Language Model.
-- Extract critical banking information automatically.
-- Validate extracted information.
-- Normalize banking data.
-- Store both structured data and complete OCR text.
-- Build an intelligent RAG assistant for banking document search and question answering.
+```mermaid
+flowchart TD
+    A[PDF Documents] --> B[Document Validation]
+    B --> C[PDF to Images]
+    C --> D[Preprocessing]
+    D --> E[PaddleOCR]
+    E --> F[OCR Post-processing]
+    F --> G[Text Reconstruction]
+    G --> H[Local Pseudonymization]
+    H --> I[Groq LLM - OCR Correction]
+    I --> J[Groq LLM - Field Extraction]
+    J --> K[Restore Original Values]
+    K --> L[Validation & Normalization]
+    L --> M[(SQLite Database)]
+    M --> N[Streamlit UI]
+    M --> O[Text-to-SQL Assistant]
+```
 
-app/
-│
-├── main.py
-├── pipeline.py
-│
-├── preprocessing/
-│   ├── loader.py
-│   ├── pdf_converter.py
-│   ├── grayscale.py
-│   ├── deskew.py
-│   ├── denoise.py
-│   ├── contrast.py
-│   └── resize.py
-│
-├── ocr/
-│   └── paddle_ocr.py
-│
-├── postprocessing/
-│   ├── ocr_postprocessor.py
-│   └── text_reconstructor.py
-│
-├── llm/
-│   ├── groq_client.py
-│   └── field_extractor.py
-│
-├── validation/
-│   └── validator.py
-│
-├── normalization/
-│   └── normalizer.py
-│
-data/
-│
-├── database/
-│   ├── connection.py
-│   ├── database_manager.py
-│   └── models.py
-│
-├── input/
-└── processed/
+### Pipeline steps
 
-PDF Documents
-      │
-      ▼
-Document Validation
-      │
-      ▼
-PDF → Images
-      │
-      ▼
-Grayscale
-      │
-      ▼
-Deskew
-      │
-      ▼
-Noise Removal
-      │
-      ▼
-Contrast Enhancement
-      │
-      ▼
-Resize
-      │
-      ▼
-PaddleOCR
-      │
-      ▼
-OCR Confidence Filtering
-      │
-      ▼
-Reading Order Reconstruction
-      │
-      ▼
-LLM OCR Correction
-      │
-      ▼
-Field Extraction
-      │
-      ▼
-Validation
-      │
-      ▼
-Normalization
-      │
-      ▼
-SQLite Database
-      │
-      ▼
-Future RAG Assistant
+1. Validate the PDF document
+2. Convert each page to an image
+3. Preprocess images (grayscale → deskew → denoise → contrast → resize)
+4. Run PaddleOCR on each page
+5. Filter low-confidence detections and reconstruct reading order
+6. Pseudonymize sensitive information locally
+7. Send pseudonymized text to Groq for OCR correction
+8. Send pseudonymized document to Groq for structured field extraction
+9. Restore original sensitive values
+10. Validate and normalize extracted fields
+11. Persist everything to SQLite
 
-# 🗄️ Database
+### Extracted fields
 
-The project stores all processed information inside a relational SQLite database.
+| Field | Description |
+|-------|-------------|
+| `cin` | National ID (CIN) |
+| `nom_prenom` | Client full name |
+| `numero_compte` | Bank account number |
+| `nature_credit` | Credit type |
+| `montant_credit` | Credit amount |
+| `date_de_decision` | Decision date |
+| `date_archivage` | Archive date |
 
-Current schema:
+---
 
-- client
-- dossier_credit
-- document
-- document_page
-- ocr_results
-- extracted_fields
-- validation_results
+## Tech Stack
 
-Each processed PDF automatically populates the database.
+| Layer | Technologies |
+|-------|--------------|
+| Language | Python 3.10 |
+| Computer vision | OpenCV, NumPy, Pillow |
+| PDF processing | pdf2image, Poppler |
+| OCR | PaddleOCR, PaddlePaddle |
+| LLM | Groq API (`openai/gpt-oss-120b`) |
+| Database | SQLite |
+| Web UI | Streamlit |
+| NLP / SQL | Text-to-SQL pipeline with SQL validation |
 
-# 🔎 OCR
+---
 
-OCR is performed using PaddleOCR.
+## Project Structure
 
-The OCR pipeline includes:
+```
+MVP-Analyse-Intelligente-Des-Dossiers-De-Credit/
+├── app/
+│   ├── main.py                 # CLI batch processor
+│   ├── pipeline.py             # End-to-end document pipeline
+│   ├── config.py               # Paths and environment config
+│   ├── preprocessing/          # PDF conversion & image preprocessing
+│   ├── ocr/                    # PaddleOCR integration
+│   ├── postprocessing/         # OCR filtering & text reconstruction
+│   ├── llm/                    # Groq client, prompts, field extraction
+│   ├── security/               # Local pseudonymization
+│   ├── validation/             # Field validation rules
+│   ├── normalization/          # Data normalization
+│   ├── text2sql/               # Natural-language SQL assistant
+│   └── ui/                     # Streamlit application
+├── data/
+│   ├── input/                  # Input PDF files (CLI mode)
+│   ├── processed/              # Intermediate images & JSON (optional)
+│   └── database/               # SQLite DB & repository layer
+├── requirements.txt
+└── .env                        # API keys & paths (not committed)
+```
 
-- Text detection
-- Text recognition
-- Confidence filtering
-- Reading-order reconstruction
-- OCR correction using Groq LLM
+---
 
-Both raw OCR output and corrected text are stored in the database.
+## Prerequisites
 
-# 🤖 Large Language Model
+- **Python 3.10**
+- **Poppler** — required by `pdf2image` for PDF-to-image conversion
+  - Windows: download from [poppler-windows](https://github.com/oschwartz10612/poppler-windows/releases) and set `POPPLER_PATH` in `.env`
+  - Linux: `sudo apt install poppler-utils`
+  - macOS: `brew install poppler`
+- **Groq API key** — sign up at [console.groq.com](https://console.groq.com)
 
-The project uses Groq API to:
+---
 
-- Correct OCR mistakes
-- Extract structured banking information
+## Installation
 
-Future versions will also use the LLM as part of the RAG system.
+```bash
+# Clone the repository
+git clone https://github.com/<your-username>/MVP-Analyse-Intelligente-Des-Dossiers-De-Credit.git
+cd MVP-Analyse-Intelligente-Des-Dossiers-De-Credit
 
-## Core
+# Create and activate a virtual environment
+python -m venv .venv
+.venv\Scripts\activate        # Windows
+# source .venv/bin/activate   # Linux / macOS
 
-- Python 3.10
-- OpenCV
-- NumPy
-- pdf2image
-- SQLite
+# Install dependencies
+pip install -r requirements.txt
 
-## OCR
+# Initialize the database
+python -m data.database.init_database
+```
 
-- PaddleOCR
-- PaddlePaddle
+---
 
-## AI
+## Configuration
 
-- Groq API
-- LLM Prompt Engineering
+Create a `.env` file at the project root:
 
-## Future
+```env
+GROQ_API_KEY=your_groq_api_key_here
 
-- LangChain
-- FAISS
-- SentenceTransformers
+# Required on Windows if Poppler is not on PATH
+POPPLER_PATH=C:\path\to\poppler\Library\bin
+```
 
-# ▶️ Running the Project
+Optional database variables (reserved for future use):
 
-Place one or more PDF files inside:
+```env
+DB_HOST=
+DB_PORT=
+DB_NAME=
+DB_USER=
+DB_PASSWORD=
+```
 
-data/input/
+---
 
-Run:
+## Usage
 
+### Option 1 — Streamlit web application (recommended)
+
+```bash
+python -m streamlit run app/ui/streamlit_app.py
+```
+
+The UI provides four sections:
+
+- **Accueil** — project overview
+- **Dossiers** — upload PDFs, run the pipeline, browse stored credit files
+- **Credit Assistant** — ask natural-language questions about the database (Text-to-SQL)
+- **Paramètres** — application settings overview
+
+### Option 2 — CLI batch processing
+
+Place one or more PDF files in `data/input/`, then run:
+
+```bash
 python -m app.main
+```
 
-Each PDF will automatically:
+Each PDF is processed sequentially. A summary is printed with dossier ID, extracted fields, and validation status.
 
-- be preprocessed
-- undergo OCR
-- have key fields extracted
-- be validated
-- be normalized
-- be stored in the SQLite database
+---
 
-# 📈 Current Progress
+## Database Schema
 
-- [x] Project architecture
-- [x] PDF preprocessing
-- [x] OCR integration (PaddleOCR)
-- [x] OCR post-processing
-- [x] OCR correction using LLM
-- [x] Banking field extraction
-- [x] Field validation
-- [x] Field normalization
-- [x] SQLite database integration
-- [x] Batch processing of multiple PDF documents
-- [ ] Search interface
-- [ ] Retrieval-Augmented Generation (RAG)
+| Table | Purpose |
+|-------|---------|
+| `client` | Client identity (CIN, name) |
+| `dossier_credit` | Credit dossier metadata |
+| `document` | Source PDF metadata |
+| `document_page` | Per-page image references |
+| `ocr_results` | Raw and corrected OCR text per page |
+| `extracted_fields` | LLM-extracted banking fields |
+| `validation_results` | Per-field validation status |
 
-## ✅ Phase 1 — Document Preprocessing
+Database file: `data/database/credit_analysis.db`
 
-Completed.
+To reset the database:
 
-## ✅ Phase 2 — OCR
+```bash
+python -m data.database.clear_database
+python -m data.database.init_database
+```
 
-Completed.
+---
 
-## ✅ Phase 3 — Information Extraction
+## Security & Privacy
 
-Completed.
+Sensitive customer data is **never sent in plain text** to external LLM services. The `Pseudonymizer` module:
 
-Currently extracting:
+1. Detects CINs, account numbers, and customer names in OCR text
+2. Replaces them with reversible tokens (e.g. `[PERSON_001]`)
+3. Sends only pseudonymized text to Groq
+4. Restores original values locally after LLM processing
 
-- Full Name
-- Account Number
-- Credit Type
-- Credit Amount
-- Production Date
-- Archive Date
+This approach reduces exposure of PII during OCR correction and field extraction.
 
-## ✅ Phase 4 — Validation & Normalization
+---
 
-Completed.
+## Development Status
 
-## ✅ Phase 5 — Database
+| Phase | Status |
+|-------|--------|
+| Document preprocessing | Done |
+| OCR integration (PaddleOCR) | Done |
+| OCR correction & field extraction (Groq) | Done |
+| Validation & normalization | Done |
+| SQLite integration | Done |
+| Batch PDF processing | Done |
+| Streamlit UI | Done |
+| Text-to-SQL assistant | Done |
+| Full RAG over document text | Planned |
+| Configurable pipeline settings | Planned |
 
-Completed.
+---
 
-## 🔄 Phase 6 — Search Interface
+## Roadmap
 
-Search client dossiers by:
+- [ ] Retrieval-Augmented Generation (RAG) over full OCR text
+- [ ] Search by CIN and advanced filters
+- [ ] Configurable LLM and OCR settings from the UI
+- [ ] Export reports (PDF / Excel)
+- [ ] PostgreSQL support for production deployment
 
-- Client name
-- (Future) National ID (CIN)
+---
 
-## 🚀 Phase 7 — Retrieval-Augmented Generation (RAG)
+## Disclaimer
 
-Allow users to ask natural-language questions about processed banking documents using the stored OCR text.
+This project is an **MVP developed in an academic / internship context**. It is not intended for production use without further security audits, compliance review, and hardening. Do not commit real customer data or API keys to version control.
 
+---
+
+## Acknowledgments
+
+- **Banque Populaire Maroc** — internship host and project context
+- [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) — open-source OCR engine
+- [Groq](https://groq.com) — fast LLM inference API
+
+---
+
+## License
+
+This repository does not include a license file yet. Contact the project maintainers before reusing or distributing the code.

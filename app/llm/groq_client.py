@@ -190,8 +190,4 @@ class GroqClient:
 
         content = response.choices[0].message.content or ""
 
-        print("========== GROQ RESPONSE ==========")
-        print(content)
-        print("===================================\n")
-
         return content

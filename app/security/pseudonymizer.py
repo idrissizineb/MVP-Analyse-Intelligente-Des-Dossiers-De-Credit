@@ -8,6 +8,25 @@ Sensitive fields:
 - CIN
 - Customer name
 - Bank account number
+
+The pseudonymization is performed at document level.
+
+Once a sensitive value is detected, all occurrences of that
+value are replaced throughout the complete OCR text.
+
+The module also handles OCR line breaks inside customer names.
+
+Example:
+
+    Mapping:
+        [PERSON_001] -> ZINEB IDRISSI
+
+    OCR:
+        ZINEB
+        IDRISSI
+
+    Result:
+        [PERSON_001]
 """
 
 import re
@@ -23,47 +42,74 @@ class Pseudonymizer:
         self.mapping: Dict[str, str] = {}
 
     # ==========================================================
-    # Pseudonymize
+    # PSEUDONYMIZE
     # ==========================================================
 
-    def pseudonymize(self, text: str) -> Tuple[str, Dict[str, str]]:
+    def pseudonymize(
+        self,
+        text: str
+    ) -> Tuple[str, Dict[str, str]]:
         """
-        Replace sensitive values with pseudonym tokens.
+        Detect and replace sensitive information.
+
+        The process is:
+
+        1. Detect account numbers.
+        2. Detect CINs.
+        3. Detect customer names.
+        4. Replace all detected values globally.
+        5. Verify that no original sensitive value remains.
 
         Returns:
             pseudonymized_text
             mapping used to restore original values
         """
 
+        # Reset mapping for every document
         self.mapping = {}
 
         # ------------------------------------------------------
-        # Account numbers
+        # 1. Bank account numbers
         # ------------------------------------------------------
 
         text = self._replace_accounts(text)
 
         # ------------------------------------------------------
-        # CIN
+        # 2. CIN
         # ------------------------------------------------------
 
         text = self._replace_cins(text)
 
         # ------------------------------------------------------
-        # Customer names
+        # 3. Customer names
         # ------------------------------------------------------
 
         text = self._replace_names(text)
 
+        # ------------------------------------------------------
+        # 4. Replace all known sensitive values globally
+        # ------------------------------------------------------
+
+        text = self._replace_known_values(text)
+
+        # ------------------------------------------------------
+        # 5. Security verification
+        # ------------------------------------------------------
+
+        self._verify_no_sensitive_data(text)
+
         return text, self.mapping
 
     # ==========================================================
-    # Restore
+    # RESTORE
     # ==========================================================
 
     def restore(self, text: str) -> str:
         """
-        Restore original sensitive values.
+        Restore original sensitive values using the local mapping.
+
+        This should only be used locally.
+        The mapping must never be sent to the external LLM.
         """
 
         # Replace longest tokens first
@@ -72,21 +118,30 @@ class Pseudonymizer:
             key=lambda item: len(item[0]),
             reverse=True
         ):
-            text = text.replace(token, original)
+            text = text.replace(
+                token,
+                original
+            )
 
         return text
 
     # ==========================================================
-    # Account number
+    # ACCOUNT NUMBER
     # ==========================================================
 
-    def _replace_accounts(self, text: str) -> str:
+    def _replace_accounts(
+        self,
+        text: str
+    ) -> str:
         """
-        Replace 16-digit bank account numbers.
+        Detect and replace 16-digit bank account numbers.
 
         Example:
+
             1234567891234567
-            ->
+
+        becomes:
+
             [ACCOUNT_001]
         """
 
@@ -113,14 +168,20 @@ class Pseudonymizer:
     # CIN
     # ==========================================================
 
-    def _replace_cins(self, text: str) -> str:
+    def _replace_cins(
+        self,
+        text: str
+    ) -> str:
         """
-        Replace Moroccan CIN-like identifiers.
+        Detect and replace Moroccan CIN-like identifiers.
 
         Expected format:
-            one or two letters followed by digits.
+
+            One or two letters followed by digits.
 
         Examples:
+
+            CIN_001
             AB123456
         """
 
@@ -144,19 +205,52 @@ class Pseudonymizer:
         )
 
     # ==========================================================
-    # Customer name
+    # CUSTOMER NAME
     # ==========================================================
 
-    def _replace_names(self, text: str) -> str:
+    def _replace_names(
+        self,
+        text: str
+    ) -> str:
         """
-        Replace customer names appearing after identity labels.
+        Detect customer names appearing after identity labels.
 
-        Only capture the name on the same line.
+        Supported examples:
+
+            Nom et prénom : ZINEB IDRISSI
+            Nom et prenom : ZINEB IDRISSI
+            Nom : ZINEB IDRISSI
+
+        The detected name is stored in the mapping.
+
+        It is then replaced globally by _replace_known_values().
         """
 
         patterns = [
-            r"(?im)(Nom\s+et\s+prénom\s*:\s*)([A-Za-zÀ-ÿ]+(?:[ \t]+[A-Za-zÀ-ÿ]+)*)",
-            r"(?im)(Nom\s*:\s*)([A-Za-zÀ-ÿ]+(?:[ \t]+[A-Za-zÀ-ÿ]+)*)",
+
+            # --------------------------------------------------
+            # Nom et prénom : ZINEB IDRISSI
+            # --------------------------------------------------
+
+            r"(?im)"
+            r"(Nom\s+et\s+prénom\s*:\s*)"
+            r"([A-Za-zÀ-ÿ]+(?:[ \t]+[A-Za-zÀ-ÿ]+)*)",
+
+            # --------------------------------------------------
+            # Nom et prenom : ZINEB IDRISSI
+            # --------------------------------------------------
+
+            r"(?im)"
+            r"(Nom\s+et\s+prenom\s*:\s*)"
+            r"([A-Za-zÀ-ÿ]+(?:[ \t]+[A-Za-zÀ-ÿ]+)*)",
+
+            # --------------------------------------------------
+            # Nom : ZINEB IDRISSI
+            # --------------------------------------------------
+
+            r"(?im)"
+            r"(Nom\s*:\s*)"
+            r"([A-Za-zÀ-ÿ]+(?:[ \t]+[A-Za-zÀ-ÿ]+)*)",
         ]
 
         for pattern in patterns:
@@ -164,6 +258,7 @@ class Pseudonymizer:
             def replacement(match):
 
                 prefix = match.group(1)
+
                 original = match.group(2).strip()
 
                 token = self._create_token(
@@ -182,7 +277,234 @@ class Pseudonymizer:
         return text
 
     # ==========================================================
-    # Token creation
+    # GLOBAL REPLACEMENT
+    # ==========================================================
+
+    def _replace_known_values(
+        self,
+        text: str
+    ) -> str:
+        """
+        Replace every previously detected sensitive value
+        throughout the complete OCR text.
+
+        This is particularly important when the same customer
+        appears on several pages.
+
+        Example:
+
+            Page 1:
+                Nom et prénom : ZINEB IDRISSI
+
+            Page 2:
+                CARTE NATIONALE D'IDENTITE
+                ZINEB
+                IDRISSI
+
+        Result:
+
+            Page 1:
+                Nom et prénom : [PERSON_001]
+
+            Page 2:
+                CARTE NATIONALE D'IDENTITE
+                [PERSON_001]
+
+        The \\s+ pattern allows OCR whitespace and line breaks.
+        """
+
+        # ------------------------------------------------------
+        # Process longest original values first
+        # ------------------------------------------------------
+
+        known_values = sorted(
+            self.mapping.items(),
+            key=lambda item: len(item[1]),
+            reverse=True
+        )
+
+        for token, original in known_values:
+
+            if not original:
+                continue
+
+            # ==================================================
+            # PERSON NAME
+            # ==================================================
+
+            if token.startswith("[PERSON_"):
+
+                name_parts = original.split()
+
+                # --------------------------------------------------
+                # Multi-part name
+                # --------------------------------------------------
+
+                if len(name_parts) >= 2:
+
+                    # Convert:
+                    #
+                    # ZINEB IDRISSI
+                    #
+                    # into:
+                    #
+                    # ZINEB\s+IDRISSI
+                    #
+                    # which matches:
+                    #
+                    # ZINEB IDRISSI
+                    # ZINEB  IDRISSI
+                    # ZINEB
+                    # IDRISSI
+
+                    pattern = r"\s+".join(
+                        re.escape(part)
+                        for part in name_parts
+                    )
+
+                    text = re.sub(
+                        pattern,
+                        token,
+                        text,
+                        flags=re.IGNORECASE
+                    )
+
+                # --------------------------------------------------
+                # Single-part name
+                # --------------------------------------------------
+
+                else:
+
+                    text = re.sub(
+                        re.escape(original),
+                        token,
+                        text,
+                        flags=re.IGNORECASE
+                    )
+
+            # ==================================================
+            # CIN
+            # ==================================================
+
+            elif token.startswith("[CIN_"):
+
+                text = re.sub(
+                    re.escape(original),
+                    token,
+                    text,
+                    flags=re.IGNORECASE
+                )
+
+            # ==================================================
+            # ACCOUNT
+            # ==================================================
+
+            elif token.startswith("[ACCOUNT_"):
+
+                text = text.replace(
+                    original,
+                    token
+                )
+
+        return text
+
+    # ==========================================================
+    # SECURITY CHECK
+    # ==========================================================
+
+    def _verify_no_sensitive_data(
+        self,
+        text: str
+    ) -> None:
+        """
+        Verify that no original sensitive value remains
+        in the text before it is sent to an external LLM.
+
+        Raises:
+            ValueError:
+                If sensitive information is still detected.
+        """
+
+        for token, original in self.mapping.items():
+
+            if not original:
+                continue
+
+            # ==================================================
+            # PERSON NAME
+            # ==================================================
+
+            if token.startswith("[PERSON_"):
+
+                name_parts = original.split()
+
+                if len(name_parts) >= 2:
+
+                    pattern = r"\s+".join(
+                        re.escape(part)
+                        for part in name_parts
+                    )
+
+                    if re.search(
+                        pattern,
+                        text,
+                        flags=re.IGNORECASE
+                    ):
+
+                        raise ValueError(
+                            "PII leakage detected before "
+                            f"external LLM transmission: "
+                            f"{token}"
+                        )
+
+                else:
+
+                    if re.search(
+                        re.escape(original),
+                        text,
+                        flags=re.IGNORECASE
+                    ):
+
+                        raise ValueError(
+                            "PII leakage detected before "
+                            f"external LLM transmission: "
+                            f"{token}"
+                        )
+
+            # ==================================================
+            # CIN
+            # ==================================================
+
+            elif token.startswith("[CIN_"):
+
+                if re.search(
+                    re.escape(original),
+                    text,
+                    flags=re.IGNORECASE
+                ):
+
+                    raise ValueError(
+                        "PII leakage detected before "
+                        f"external LLM transmission: "
+                        f"{token}"
+                    )
+
+            # ==================================================
+            # ACCOUNT
+            # ==================================================
+
+            elif token.startswith("[ACCOUNT_"):
+
+                if original in text:
+
+                    raise ValueError(
+                        "PII leakage detected before "
+                        f"external LLM transmission: "
+                        f"{token}"
+                    )
+
+    # ==========================================================
+    # TOKEN CREATION
     # ==========================================================
 
     def _create_token(
@@ -190,21 +512,38 @@ class Pseudonymizer:
         category: str,
         original: str
     ) -> str:
+        """
+        Create a pseudonym token.
 
-        # Reuse existing token if value was already encountered
+        If the same sensitive value has already been detected,
+        reuse its existing token.
+        """
+
+        # ------------------------------------------------------
+        # Reuse existing token
+        # ------------------------------------------------------
+
         for token, value in self.mapping.items():
 
             if value == original:
 
                 return token
 
+        # ------------------------------------------------------
+        # Generate next token number
+        # ------------------------------------------------------
+
         number = sum(
             1
             for token in self.mapping
-            if token.startswith(f"[{category}_")
+            if token.startswith(
+                f"[{category}_"
+            )
         ) + 1
 
-        token = f"[{category}_{number:03d}]"
+        token = (
+            f"[{category}_{number:03d}]"
+        )
 
         self.mapping[token] = original
 
