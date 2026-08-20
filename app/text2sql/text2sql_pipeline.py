@@ -3,24 +3,42 @@ from app.text2sql.sql_validator import SQLValidator
 from app.text2sql.sql_executor import SQLExecutor
 from app.text2sql.answer_generator import AnswerGenerator
 from app.text2sql.entity_extractor import EntityExtractor
+from app.security.pseudonymizer import Pseudonymizer
 
 
 class Text2SQLPipeline:
     """
-    Complete Text-to-SQL pipeline.
+    Complete secure Text-to-SQL pipeline.
 
-    Workflow
-    --------
-    1. Receive a question in natural language.
-    2. Generate an SQL query using the LLM.
-    3. Validate the generated SQL.
-    4. Execute the SQL query.
-    5. Convert the SQL results into a natural-language answer.
+    Security workflow
+    -----------------
+    1. Receive original question.
+    2. Pseudonymize sensitive values locally.
+    3. Send ONLY pseudonymized question to Groq.
+    4. Generate SQL using placeholders.
+    5. Extract pseudonymized entities locally.
+    6. Restore real values locally for SQLite parameters.
+    7. Execute SQL locally.
+    8. Pseudonymize SQL results locally.
+    9. Send ONLY pseudonymized results to Groq.
+    10. Restore sensitive values locally in the final answer.
     """
 
     def __init__(self):
 
-        self.database_path = "data/database/credit_analysis.db"
+        self.database_path = (
+            "data/database/credit_analysis.db"
+        )
+
+        # --------------------------------------------------
+        # Shared pseudonymizer
+        # --------------------------------------------------
+
+        self.pseudonymizer = Pseudonymizer()
+
+        # --------------------------------------------------
+        # Components
+        # --------------------------------------------------
 
         self.sql_generator = SQLGenerator(
             database_path=self.database_path
@@ -36,34 +54,58 @@ class Text2SQLPipeline:
 
         self.entity_extractor = EntityExtractor()
 
+    # ======================================================
+    # ASK
+    # ======================================================
+
     def ask(
         self,
         question: str
     ) -> dict:
-        """
-        Execute the complete Text-to-SQL pipeline.
 
-        Parameters
-        ----------
-        question : str
-            User question.
+        # ==================================================
+        # STEP 1 - PSEUDONYMIZE QUESTION LOCALLY
+        # ==================================================
 
-        Returns
-        -------
-        dict
-        """
+        print(
+            "\n========== TEXT-TO-SQL SECURITY =========="
+        )
 
-        # =====================================================
-        # STEP 1 - Generate SQL
-        # =====================================================
+        print(
+            "\nOriginal question:"
+        )
 
-        sql = self.sql_generator.generate_sql(question)
+        print(question)
 
-        # =====================================================
-        # STEP 2 - Validate SQL
-        # =====================================================
+        pseudonymized_question = (
+            self.pseudonymizer.pseudonymize_query(
+                question
+            )
+        )
 
-        valid, reason = self.sql_validator.validate(sql)
+        print(
+            "\nQuestion sent to Groq:"
+        )
+
+        print(
+            pseudonymized_question
+        )
+
+        # ==================================================
+        # STEP 2 - GENERATE SQL
+        # ==================================================
+
+        sql = self.sql_generator.generate_sql(
+            pseudonymized_question
+        )
+
+        # ==================================================
+        # STEP 3 - VALIDATE SQL
+        # ==================================================
+
+        valid, reason = (
+            self.sql_validator.validate(sql)
+        )
 
         if not valid:
 
@@ -74,32 +116,126 @@ class Text2SQLPipeline:
                 "error": reason,
             }
 
-        # =====================================================
-        # STEP 3 - Execute SQL
-        # =====================================================
+        # ==================================================
+        # STEP 4 - EXTRACT ENTITIES FROM ORIGINAL QUESTION
+        # ==================================================
 
-        parameters = self.entity_extractor.extract(question)
-        print("Parameters:", parameters)
+        # IMPORTANT:
+        #
+        # EntityExtractor works on the ORIGINAL question.
+        #
+        # This gives us the real values locally.
+        #
+        # Example:
+        #
+        # Original:
+        # "Quel est le crédit de IDRISSI ZINEB ?"
+        #
+        # Parameters:
+        # {
+        #     "client_name": "IDRISSI ZINEB"
+        # }
 
-        results = self.sql_executor.execute(sql, parameters)
+        parameters = (
+            self.entity_extractor.extract(
+                question
+            )
+        )
 
-        # =====================================================
-        # STEP 4 - Generate answer
-        # =====================================================
+        print(
+            "\nLocal parameters:"
+        )
 
-        answer = self.answer_generator.generate(
-            question,
+        print(
+            parameters
+        )
+
+        # ==================================================
+        # STEP 5 - EXECUTE SQL LOCALLY
+        # ==================================================
+
+        # The SQL contains placeholders such as:
+        #
+        # WHERE nom_prenom = :client_name
+        #
+        # The real value stays local.
+        #
+        results = self.sql_executor.execute(
+            sql,
+            parameters
+        )
+
+        print(
+            "\n========== SQL RESULTS =========="
+        )
+
+        print(
             results
         )
 
-        # =====================================================
+        # ==================================================
+        # STEP 6 - PSEUDONYMIZE SQL RESULTS
+        # ==================================================
+
+        pseudonymized_results = (
+            self.pseudonymizer.pseudonymize_records(
+                results
+            )
+        )
+
+        print(
+            "\n========== RESULTS SENT TO GROQ =========="
+        )
+
+        print(
+            pseudonymized_results
+        )
+
+        # ==================================================
+        # STEP 7 - GENERATE ANSWER
+        # ==================================================
+
+        answer = (
+            self.answer_generator.generate(
+                question=pseudonymized_question,
+                sql_results=pseudonymized_results
+            )
+        )
+
+        # ==================================================
+        # STEP 8 - RESTORE SENSITIVE VALUES LOCALLY
+        # ==================================================
+
+        restored_answer = (
+            self.pseudonymizer.restore_query_placeholders(
+                answer
+            )
+        )
+
+        print(
+            "\n========== FINAL ANSWER =========="
+        )
+
+        print(
+            restored_answer
+        )
+
+        # ==================================================
         # RETURN
-        # =====================================================
+        # ==================================================
 
         return {
             "success": True,
+
+            # Original question is kept locally
             "question": question,
+
+            # SQL generated from pseudonymized question
             "generated_sql": sql,
+
+            # Original DB results stay local
             "results": results,
-            "answer": answer,
+
+            # Final answer is restored locally
+            "answer": restored_answer,
         }

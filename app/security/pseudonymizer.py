@@ -490,3 +490,245 @@ class Pseudonymizer:
         self.mapping[token] = original
 
         return token
+
+    # ==========================================================
+    # TEXT-TO-SQL
+    # ==========================================================
+
+    SENSITIVE_COLUMNS = {
+        "cin": "CIN",
+        "nom_prenom": "PERSON",
+        "numero_compte": "ACCOUNT",
+    }
+
+    QUERY_NAME_STOPWORDS = {
+        "quel", "quelle", "quels", "quelles",
+        "est", "sont", "le", "la", "les", "du", "de", "des",
+        "un", "une", "et", "ou", "pour", "par", "sur",
+        "type", "nature", "montant", "credit", "crédit",
+        "credits", "crédits", "client", "clients",
+        "dossier", "dossiers", "document", "documents",
+        "compte", "comptes", "date", "decision", "décision",
+        "archivage", "enregistre", "enregistrés", "enregistres",
+    }
+
+    def pseudonymize_query(
+        self,
+        text: str
+    ) -> str:
+        """
+        Mask identifiers in a natural-language question.
+
+        Used before sending a Text-to-SQL question to Groq.
+        """
+
+        text = self._replace_known_persons(text)
+        text = self._replace_accounts(text)
+        text = self._replace_cins(text)
+        text = self._replace_uppercase_names(text)
+        text = self._replace_names_after_client_keyword(text)
+        text = self._replace_known_person_parts(text)
+
+        return text
+
+    def apply_mapping_to_text(
+        self,
+        text: str
+    ) -> str:
+        """
+        Replace already-known sensitive values inside text.
+        """
+
+        text = self._replace_known_persons(text)
+        text = self._replace_accounts(text)
+        text = self._replace_cins(text)
+        text = self._replace_known_person_parts(text)
+
+        return text
+
+    def restore_query_placeholders(
+        self,
+        text: str
+    ) -> str:
+        """
+        Restore original values in an LLM answer.
+
+        Also recovers tokens if the model dropped the brackets.
+        """
+
+        restored = self.restore(text)
+
+        for token, original in sorted(
+            self.mapping.items(),
+            key=lambda item: len(item[0]),
+            reverse=True
+        ):
+            inner = token[1:-1]
+            restored = restored.replace(inner, original)
+
+        return restored
+
+    def pseudonymize_records(
+        self,
+        records: list
+    ) -> list:
+        """
+        Mask sensitive fields in SQL result rows.
+        """
+
+        return [
+            self._pseudonymize_record(record)
+            for record in records
+        ]
+
+    def _pseudonymize_record(
+        self,
+        record: dict
+    ) -> dict:
+
+        if not isinstance(record, dict):
+            return record
+
+        masked = {}
+
+        priority_keys = [
+            key
+            for key in record
+            if key.lower() in self.SENSITIVE_COLUMNS
+        ]
+
+        other_keys = [
+            key
+            for key in record
+            if key not in priority_keys
+        ]
+
+        for key in priority_keys + other_keys:
+            masked[key] = self._pseudonymize_field(
+                key,
+                record[key]
+            )
+
+        return masked
+
+    def _pseudonymize_field(
+        self,
+        key: str,
+        value
+    ):
+
+        if value is None:
+            return None
+
+        if isinstance(value, dict):
+            return self._pseudonymize_record(value)
+
+        if isinstance(value, list):
+            return [
+                self._pseudonymize_record(item)
+                if isinstance(item, dict)
+                else self._pseudonymize_field(key, item)
+                for item in value
+            ]
+
+        if not isinstance(value, str):
+            return value
+
+        category = self.SENSITIVE_COLUMNS.get(
+            key.lower()
+        )
+
+        if category:
+            return self._create_token(
+                category,
+                value
+            )
+
+        masked = self._replace_known_persons(value)
+        masked = self._replace_accounts(masked)
+        masked = self._replace_cins(masked)
+        masked = self._replace_known_person_parts(masked)
+
+        return masked
+
+    def _replace_uppercase_names(
+        self,
+        text: str
+    ) -> str:
+        """
+        Replace ALL-CAPS multi-word names in questions.
+
+        Example:
+            IDRISSI ZINEB -> [PERSON_001]
+        """
+
+        pattern = (
+            r"\b([A-ZÀ-Ÿ]{2,}"
+            r"(?:[ \t]+[A-ZÀ-Ÿ]{2,}){1,3})\b"
+        )
+
+        def replacement(match):
+
+            original = match.group(1)
+
+            words = original.split()
+
+            if all(
+                word.lower() in self.QUERY_NAME_STOPWORDS
+                for word in words
+            ):
+                return original
+
+            return self._create_token(
+                "PERSON",
+                original
+            )
+
+        return re.sub(
+            pattern,
+            replacement,
+            text
+        )
+
+    def _replace_names_after_client_keyword(
+        self,
+        text: str
+    ) -> str:
+        """
+        Replace a name that follows the word 'client'.
+
+        Example:
+            client Idrissi Zineb -> client [PERSON_001]
+        """
+
+        pattern = (
+            r"(?i)(\bclient(?:e)?s?\s+)"
+            r"(?!\[)"
+            r"([A-Za-zÀ-ÿ]+(?:[ \t]+[A-Za-zÀ-ÿ]+){0,3})"
+        )
+
+        def replacement(match):
+
+            prefix = match.group(1)
+            original = match.group(2).strip()
+
+            words = original.split()
+
+            if all(
+                word.lower() in self.QUERY_NAME_STOPWORDS
+                for word in words
+            ):
+                return match.group(0)
+
+            token = self._create_token(
+                "PERSON",
+                original
+            )
+
+            return prefix + token
+
+        return re.sub(
+            pattern,
+            replacement,
+            text
+        )
