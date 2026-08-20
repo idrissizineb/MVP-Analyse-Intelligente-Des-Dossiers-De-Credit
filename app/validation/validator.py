@@ -317,11 +317,9 @@ class Validator:
             value
         ).strip()
 
-        # Remove spaces used as thousands separators.
-        cleaned_value = cleaned_value.replace(
-            " ",
-            ""
-        )
+        # Remove regular and Unicode spaces used as thousands
+        # separators (NBSP, narrow NBSP, thin space, etc.)
+        cleaned_value = re.sub(r"\s+", "", cleaned_value)
 
         # Accept:
         # 740000

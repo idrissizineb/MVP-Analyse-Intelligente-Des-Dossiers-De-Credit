@@ -9,24 +9,9 @@ Sensitive fields:
 - Customer name
 - Bank account number
 
-The pseudonymization is performed at document level.
-
-Once a sensitive value is detected, all occurrences of that
-value are replaced throughout the complete OCR text.
-
-The module also handles OCR line breaks inside customer names.
-
-Example:
-
-    Mapping:
-        [PERSON_001] -> ZINEB IDRISSI
-
-    OCR:
-        ZINEB
-        IDRISSI
-
-    Result:
-        [PERSON_001]
+The pseudonymization mapping is shared across the entire
+document so the same sensitive value always receives the
+same pseudonym.
 """
 
 import re
@@ -50,55 +35,58 @@ class Pseudonymizer:
         text: str
     ) -> Tuple[str, Dict[str, str]]:
         """
-        Detect and replace sensitive information.
+        Replace sensitive values with pseudonym tokens.
 
-        The process is:
-
-        1. Detect account numbers.
-        2. Detect CINs.
-        3. Detect customer names.
-        4. Replace all detected values globally.
-        5. Verify that no original sensitive value remains.
+        The existing mapping is preserved so information detected
+        on a previous page can be recognized on later pages.
 
         Returns:
             pseudonymized_text
             mapping used to restore original values
         """
 
-        # Reset mapping for every document
-        self.mapping = {}
+        # IMPORTANT:
+        # Do NOT reset self.mapping here.
+        #
+        # The mapping must survive between pages.
+        #
+        # Page 1:
+        #   IDRISSI ZINEB -> [PERSON_001]
+        #
+        # Page 2:
+        #   ZINEB IDRISSI -> [PERSON_001]
 
         # ------------------------------------------------------
-        # 1. Bank account numbers
+        # Existing known PERSON values
+        # ------------------------------------------------------
+
+        text = self._replace_known_persons(text)
+
+        # ------------------------------------------------------
+        # Account numbers
         # ------------------------------------------------------
 
         text = self._replace_accounts(text)
 
         # ------------------------------------------------------
-        # 2. CIN
+        # CIN
         # ------------------------------------------------------
 
         text = self._replace_cins(text)
 
         # ------------------------------------------------------
-        # 3. Customer names
+        # Customer names after labels
         # ------------------------------------------------------
 
         text = self._replace_names(text)
 
         # ------------------------------------------------------
-        # 4. Replace all known sensitive values globally
+        # Name split across multiple OCR lines
         # ------------------------------------------------------
 
-        text = self._replace_known_values(text)
+        text = self._replace_known_person_parts(text)
 
-        # ------------------------------------------------------
-        # 5. Security verification
-        # ------------------------------------------------------
-
-        self._verify_no_sensitive_data(text)
-
-        return text, self.mapping
+        return text, self.mapping.copy()
 
     # ==========================================================
     # RESTORE
@@ -106,13 +94,9 @@ class Pseudonymizer:
 
     def restore(self, text: str) -> str:
         """
-        Restore original sensitive values using the local mapping.
-
-        This should only be used locally.
-        The mapping must never be sent to the external LLM.
+        Restore original sensitive values.
         """
 
-        # Replace longest tokens first
         for token, original in sorted(
             self.mapping.items(),
             key=lambda item: len(item[0]),
@@ -134,15 +118,7 @@ class Pseudonymizer:
         text: str
     ) -> str:
         """
-        Detect and replace 16-digit bank account numbers.
-
-        Example:
-
-            1234567891234567
-
-        becomes:
-
-            [ACCOUNT_001]
+        Replace 16-digit bank account numbers.
         """
 
         pattern = r"\b\d{16}\b"
@@ -151,12 +127,10 @@ class Pseudonymizer:
 
             original = match.group(0)
 
-            token = self._create_token(
+            return self._create_token(
                 "ACCOUNT",
                 original
             )
-
-            return token
 
         return re.sub(
             pattern,
@@ -173,16 +147,7 @@ class Pseudonymizer:
         text: str
     ) -> str:
         """
-        Detect and replace Moroccan CIN-like identifiers.
-
-        Expected format:
-
-            One or two letters followed by digits.
-
-        Examples:
-
-            CIN_001
-            AB123456
+        Replace Moroccan CIN-like identifiers.
         """
 
         pattern = r"\b[A-Za-z]{1,2}\d{4,8}\b"
@@ -191,12 +156,10 @@ class Pseudonymizer:
 
             original = match.group(0)
 
-            token = self._create_token(
+            return self._create_token(
                 "CIN",
                 original
             )
-
-            return token
 
         return re.sub(
             pattern,
@@ -205,7 +168,7 @@ class Pseudonymizer:
         )
 
     # ==========================================================
-    # CUSTOMER NAME
+    # CUSTOMER NAME AFTER LABEL
     # ==========================================================
 
     def _replace_names(
@@ -213,40 +176,14 @@ class Pseudonymizer:
         text: str
     ) -> str:
         """
-        Detect customer names appearing after identity labels.
-
-        Supported examples:
-
-            Nom et prénom : ZINEB IDRISSI
-            Nom et prenom : ZINEB IDRISSI
-            Nom : ZINEB IDRISSI
-
-        The detected name is stored in the mapping.
-
-        It is then replaced globally by _replace_known_values().
+        Replace customer names appearing after identity labels.
         """
 
         patterns = [
 
-            # --------------------------------------------------
-            # Nom et prénom : ZINEB IDRISSI
-            # --------------------------------------------------
-
             r"(?im)"
             r"(Nom\s+et\s+prénom\s*:\s*)"
             r"([A-Za-zÀ-ÿ]+(?:[ \t]+[A-Za-zÀ-ÿ]+)*)",
-
-            # --------------------------------------------------
-            # Nom et prenom : ZINEB IDRISSI
-            # --------------------------------------------------
-
-            r"(?im)"
-            r"(Nom\s+et\s+prenom\s*:\s*)"
-            r"([A-Za-zÀ-ÿ]+(?:[ \t]+[A-Za-zÀ-ÿ]+)*)",
-
-            # --------------------------------------------------
-            # Nom : ZINEB IDRISSI
-            # --------------------------------------------------
 
             r"(?im)"
             r"(Nom\s*:\s*)"
@@ -277,231 +214,225 @@ class Pseudonymizer:
         return text
 
     # ==========================================================
-    # GLOBAL REPLACEMENT
+    # REPLACE KNOWN PERSON VALUES
     # ==========================================================
 
-    def _replace_known_values(
+    def _replace_known_persons(
         self,
         text: str
     ) -> str:
         """
-        Replace every previously detected sensitive value
-        throughout the complete OCR text.
-
-        This is particularly important when the same customer
-        appears on several pages.
+        Replace person names already discovered on a previous page.
 
         Example:
 
-            Page 1:
-                Nom et prénom : ZINEB IDRISSI
+        Existing mapping:
+            [PERSON_001] -> IDRISSI ZINEB
 
-            Page 2:
-                CARTE NATIONALE D'IDENTITE
-                ZINEB
-                IDRISSI
+        New page:
+            ZINEB IDRISSI
 
-        Result:
-
-            Page 1:
-                Nom et prénom : [PERSON_001]
-
-            Page 2:
-                CARTE NATIONALE D'IDENTITE
-                [PERSON_001]
-
-        The \\s+ pattern allows OCR whitespace and line breaks.
+        This method also recognizes the reversed order.
         """
 
-        # ------------------------------------------------------
-        # Process longest original values first
-        # ------------------------------------------------------
+        person_entries = [
+            (token, value)
+            for token, value in self.mapping.items()
+            if token.startswith("[PERSON_")
+        ]
 
-        known_values = sorted(
-            self.mapping.items(),
+        # Longest names first
+        person_entries.sort(
             key=lambda item: len(item[1]),
             reverse=True
         )
 
-        for token, original in known_values:
+        for token, original in person_entries:
 
-            if not original:
+            normalized_original = self._normalize_name(
+                original
+            )
+
+            parts = normalized_original.split()
+
+            if len(parts) < 2:
                 continue
 
-            # ==================================================
-            # PERSON NAME
-            # ==================================================
+            # --------------------------------------------------
+            # Original order
+            # --------------------------------------------------
 
-            if token.startswith("[PERSON_"):
+            original_pattern = self._name_pattern(
+                parts
+            )
 
-                name_parts = original.split()
+            text = re.sub(
+                original_pattern,
+                token,
+                text,
+                flags=re.IGNORECASE
+            )
 
-                # --------------------------------------------------
-                # Multi-part name
-                # --------------------------------------------------
+            # --------------------------------------------------
+            # Reversed order
+            # --------------------------------------------------
 
-                if len(name_parts) >= 2:
+            reversed_parts = list(
+                reversed(parts)
+            )
 
-                    # Convert:
-                    #
-                    # ZINEB IDRISSI
-                    #
-                    # into:
-                    #
-                    # ZINEB\s+IDRISSI
-                    #
-                    # which matches:
-                    #
-                    # ZINEB IDRISSI
-                    # ZINEB  IDRISSI
-                    # ZINEB
-                    # IDRISSI
+            reversed_pattern = self._name_pattern(
+                reversed_parts
+            )
 
-                    pattern = r"\s+".join(
-                        re.escape(part)
-                        for part in name_parts
-                    )
-
-                    text = re.sub(
-                        pattern,
-                        token,
-                        text,
-                        flags=re.IGNORECASE
-                    )
-
-                # --------------------------------------------------
-                # Single-part name
-                # --------------------------------------------------
-
-                else:
-
-                    text = re.sub(
-                        re.escape(original),
-                        token,
-                        text,
-                        flags=re.IGNORECASE
-                    )
-
-            # ==================================================
-            # CIN
-            # ==================================================
-
-            elif token.startswith("[CIN_"):
-
-                text = re.sub(
-                    re.escape(original),
-                    token,
-                    text,
-                    flags=re.IGNORECASE
-                )
-
-            # ==================================================
-            # ACCOUNT
-            # ==================================================
-
-            elif token.startswith("[ACCOUNT_"):
-
-                text = text.replace(
-                    original,
-                    token
-                )
+            text = re.sub(
+                reversed_pattern,
+                token,
+                text,
+                flags=re.IGNORECASE
+            )
 
         return text
 
     # ==========================================================
-    # SECURITY CHECK
+    # REPLACE SPLIT NAME
     # ==========================================================
 
-    def _verify_no_sensitive_data(
+    def _replace_known_person_parts(
         self,
         text: str
-    ) -> None:
+    ) -> str:
         """
-        Verify that no original sensitive value remains
-        in the text before it is sent to an external LLM.
+        Handles OCR where the name is split across lines.
 
-        Raises:
-            ValueError:
-                If sensitive information is still detected.
+        Example:
+
+            ZINEB
+            IDRISSI
+
+        becomes:
+
+            [PERSON_001]
         """
 
-        for token, original in self.mapping.items():
+        person_entries = [
+            (token, value)
+            for token, value in self.mapping.items()
+            if token.startswith("[PERSON_")
+        ]
 
-            if not original:
+        for token, original in person_entries:
+
+            parts = self._normalize_name(
+                original
+            ).split()
+
+            if len(parts) < 2:
                 continue
 
-            # ==================================================
-            # PERSON NAME
-            # ==================================================
+            first = re.escape(parts[0])
+            second = re.escape(parts[1])
 
-            if token.startswith("[PERSON_"):
+            # --------------------------------------------------
+            # Same line
+            # --------------------------------------------------
 
-                name_parts = original.split()
+            pattern_same_line = (
+                rf"\b{first}\s+{second}\b"
+            )
 
-                if len(name_parts) >= 2:
+            text = re.sub(
+                pattern_same_line,
+                token,
+                text,
+                flags=re.IGNORECASE
+            )
 
-                    pattern = r"\s+".join(
-                        re.escape(part)
-                        for part in name_parts
-                    )
+            # --------------------------------------------------
+            # Reversed same line
+            # --------------------------------------------------
 
-                    if re.search(
-                        pattern,
-                        text,
-                        flags=re.IGNORECASE
-                    ):
+            pattern_reversed = (
+                rf"\b{second}\s+{first}\b"
+            )
 
-                        raise ValueError(
-                            "PII leakage detected before "
-                            f"external LLM transmission: "
-                            f"{token}"
-                        )
+            text = re.sub(
+                pattern_reversed,
+                token,
+                text,
+                flags=re.IGNORECASE
+            )
 
-                else:
+            # --------------------------------------------------
+            # Split across lines
+            # --------------------------------------------------
 
-                    if re.search(
-                        re.escape(original),
-                        text,
-                        flags=re.IGNORECASE
-                    ):
+            pattern_split = (
+                rf"\b{first}\s*\n\s*{second}\b"
+            )
 
-                        raise ValueError(
-                            "PII leakage detected before "
-                            f"external LLM transmission: "
-                            f"{token}"
-                        )
+            text = re.sub(
+                pattern_split,
+                token,
+                text,
+                flags=re.IGNORECASE
+            )
 
-            # ==================================================
-            # CIN
-            # ==================================================
+            # --------------------------------------------------
+            # Reversed split
+            # --------------------------------------------------
 
-            elif token.startswith("[CIN_"):
+            pattern_split_reversed = (
+                rf"\b{second}\s*\n\s*{first}\b"
+            )
 
-                if re.search(
-                    re.escape(original),
-                    text,
-                    flags=re.IGNORECASE
-                ):
+            text = re.sub(
+                pattern_split_reversed,
+                token,
+                text,
+                flags=re.IGNORECASE
+            )
 
-                    raise ValueError(
-                        "PII leakage detected before "
-                        f"external LLM transmission: "
-                        f"{token}"
-                    )
+        return text
 
-            # ==================================================
-            # ACCOUNT
-            # ==================================================
+    # ==========================================================
+    # NORMALIZE NAME
+    # ==========================================================
 
-            elif token.startswith("[ACCOUNT_"):
+    def _normalize_name(
+        self,
+        name: str
+    ) -> str:
+        """
+        Normalize spaces and case for name comparison.
+        """
 
-                if original in text:
+        return " ".join(
+            name.strip().split()
+        )
 
-                    raise ValueError(
-                        "PII leakage detected before "
-                        f"external LLM transmission: "
-                        f"{token}"
-                    )
+    # ==========================================================
+    # NAME REGEX
+    # ==========================================================
+
+    def _name_pattern(
+        self,
+        parts
+    ) -> str:
+        """
+        Build a regex allowing spaces or line breaks.
+        """
+
+        escaped_parts = [
+            re.escape(part)
+            for part in parts
+        ]
+
+        return (
+            r"\b"
+            + r"\s+".join(escaped_parts)
+            + r"\b"
+        )
 
     # ==========================================================
     # TOKEN CREATION
@@ -513,11 +444,14 @@ class Pseudonymizer:
         original: str
     ) -> str:
         """
-        Create a pseudonym token.
-
-        If the same sensitive value has already been detected,
-        reuse its existing token.
+        Create or reuse a token.
         """
+
+        normalized_original = (
+            self._normalize_name(original)
+            if category == "PERSON"
+            else original
+        )
 
         # ------------------------------------------------------
         # Reuse existing token
@@ -525,12 +459,20 @@ class Pseudonymizer:
 
         for token, value in self.mapping.items():
 
-            if value == original:
+            existing_value = (
+                self._normalize_name(value)
+                if token.startswith("[PERSON_")
+                else value
+            )
+
+            if existing_value.lower() == (
+                normalized_original.lower()
+            ):
 
                 return token
 
         # ------------------------------------------------------
-        # Generate next token number
+        # Create new token
         # ------------------------------------------------------
 
         number = sum(

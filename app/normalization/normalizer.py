@@ -5,6 +5,8 @@ This module converts validated extracted values into
 standard Python types before database storage.
 """
 
+import re
+
 
 class Normalizer:
     """
@@ -162,11 +164,9 @@ class Normalizer:
             .strip()
         )
 
-        # Remove spaces used as thousands separators
-        normalized_value = (
-            normalized_value
-            .replace(" ", "")
-        )
+        # Remove regular and Unicode spaces used as thousands
+        # separators (NBSP, narrow NBSP, thin space, etc.)
+        normalized_value = re.sub(r"\s+", "", normalized_value)
 
         # Convert French decimal separator
         normalized_value = (
