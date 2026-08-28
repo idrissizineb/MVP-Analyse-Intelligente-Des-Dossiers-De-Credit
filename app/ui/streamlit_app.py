@@ -1,6 +1,7 @@
+import sys
+import os
 import streamlit as st
 from pathlib import Path
-
 from app.ui.views.home import show_home
 from app.ui.views.dossiers import show_dossiers
 from app.ui.views.assistant import show_assistant

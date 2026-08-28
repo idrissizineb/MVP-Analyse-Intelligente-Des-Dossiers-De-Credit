@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  credit-analysis-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: credit_analysis_platform
+    ports:
+      - "8000:8000"
+      - "8501:8501"
+    # Load environment variables from your root .env file
+    env_file:
+      - .env
+    environment:
+      - ENVIRONMENT=development
+      - DATABASE_URL=sqlite:////app/app/data/database/credit_analysis.db
+      - PADDLE_HOME=/app/.paddleocr
+      - PYTHONPATH=/app
+      # Fallback pass-through if env_file is not used:
+      - GROQ_API_KEY=${GROQ_API_KEY}
+    volumes:
+      - ./app/data/input:/app/app/data/input
+      - ./app/data/processed:/app/app/data/processed
+      - ./app/data/output:/app/app/data/output
+      - ./app/data/database:/app/app/data/database
+      - paddle_models:/app/.paddleocr
+
+volumes:
+  paddle_models:

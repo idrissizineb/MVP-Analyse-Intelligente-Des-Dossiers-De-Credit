@@ -1,14 +1,21 @@
+import sys
+from pathlib import Path
+
+import streamlit as st
+from app.pipeline import DocumentPipeline
+from app.ui.components.cards import info_card
+from app.ui.components.dossier_card import dossier_card
+
 import tempfile
 
 import sqlite3
-from pathlib import Path
 
 import streamlit as st
 
 from app.pipeline import DocumentPipeline
 from app.ui.components.cards import info_card
 from app.ui.components.dossier_card import dossier_card
-from data.database.dossier_repository import DossierRepository
+from app.data.database.dossier_repository import DossierRepository
 
 
 def show_dossiers():

@@ -1,5 +1,5 @@
-from data.database.connection import DatabaseConnection
-from data.database.database_manager import DatabaseManager
+from app.data.database.connection import DatabaseConnection
+from app.data.database.database_manager import DatabaseManager
 
 
 def main():

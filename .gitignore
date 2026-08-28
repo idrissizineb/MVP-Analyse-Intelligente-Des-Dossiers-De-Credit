@@ -1,7 +1,8 @@
 .env
-.venv
+.venv/
 data/input/
 data/processed/
 data/output/
 __pycache__/
 data/database/credit_analysis.db
+*.pyc

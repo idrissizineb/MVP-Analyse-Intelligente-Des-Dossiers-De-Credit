@@ -7,9 +7,9 @@ documents, pages, OCR results, extracted fields, and
 validation results.
 """
 
-from data.database.connection import DatabaseConnection  # pyright: ignore[reportMissingImports]
+from app.data.database.connection import DatabaseConnection  # pyright: ignore[reportMissingImports]
 
-from data.database.models import (
+from app.data.database.models import (
     CREATE_CLIENT_TABLE,
     CREATE_DOSSIER_CREDIT_TABLE,
     CREATE_DOCUMENT_TABLE,

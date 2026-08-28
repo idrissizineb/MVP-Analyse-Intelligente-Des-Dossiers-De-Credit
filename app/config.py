@@ -1,34 +1,40 @@
+import os
+import platform
 from pathlib import Path
 from dotenv import load_dotenv
-import os
 
-#load environment variables from .env file
+# load environment variables from .env file
 load_dotenv()
 
-#project Paths
+# project Paths
 
-#root directory of the project
+# root directory of the project
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-#Data folders
+# Data folders
 DATA_DIR = BASE_DIR / "data"
 INPUT_DIR = DATA_DIR / "input"
 PROCESSED_DIR = DATA_DIR / "processed"
 OUTPUT_DIR = DATA_DIR / "output"
-POPPLER_PATH = os.getenv("POPPLER_PATH")
-#OCR Configuration
 
+# Poppler Configuration
+# In Docker/Linux, poppler-utils is installed globally so POPPLER_PATH must be None.
+# On Windows, fallback to the environment variable path.
+if platform.system() != "Windows":
+    POPPLER_PATH = None
+else:
+    POPPLER_PATH = os.getenv("POPPLER_PATH")
+
+# OCR Configuration
 OCR_LANGUAGE = "fr"
-
 USE_GPU = False
 
-#Supported File Types
-
+# Supported File Types
 SUPPORTED_EXTENSIONS = [
     ".pdf"
 ]
-#Future Database Configuration
 
+# Database Configuration
 DB_HOST = os.getenv("DB_HOST")
 DB_PORT = os.getenv("DB_PORT")
 DB_NAME = os.getenv("DB_NAME")

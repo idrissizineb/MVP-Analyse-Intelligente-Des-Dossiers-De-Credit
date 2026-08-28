@@ -1,4 +1,6 @@
+import sys
 from pathlib import Path
+
 import cv2
 import json
 
@@ -59,8 +61,8 @@ from app.normalization.normalizer import Normalizer
 # DATABASE
 # ==========================================================
 
-from data.database.connection import DatabaseConnection
-from data.database.database_manager import DatabaseManager
+from app.data.database.connection import DatabaseConnection
+from app.data.database.database_manager import DatabaseManager
 
 
 class DocumentPipeline:
